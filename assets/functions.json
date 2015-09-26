@@ -1,0 +1,29 @@
+{
+  "exports": [
+    {
+      "id": "embedded.commerce.orders.action.after",
+      "virtualPath": "./dist\\commerce.orders.manifest.all.js",
+      "actionId": "embedded.commerce.orders.action.after"
+    },
+    {
+      "id": "http.commerce.orders.setFulFillmentInfo.before",
+      "virtualPath": "./dist\\commerce.orders.manifest.all.js",
+      "actionId": "http.commerce.orders.setFulFillmentInfo.before"
+    },
+    {
+      "id": "embedded.commerce.payments.action.performPaymentInteraction",
+      "virtualPath": "./dist\\commerce.payments.manifest.all.js",
+      "actionId": "embedded.commerce.payments.action.performPaymentInteraction"
+    },
+    {
+      "id": "embedded.platform.applications.install",
+      "virtualPath": "./dist\\platform.applications.manifest.all.js",
+      "actionId": "embedded.platform.applications.install"
+    },
+    {
+      "id": "http.storefront.pages.global.request.before",
+      "virtualPath": "./dist\\storefront.manifest.all.js",
+      "actionId": "http.storefront.pages.global.request.before"
+    }
+  ]
+}

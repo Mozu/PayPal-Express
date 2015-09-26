@@ -1,0 +1,28 @@
+{
+  "name": "PayPal-Express",
+  "version": "0.1.0",
+  "description": "PayPal Express Integration",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mozu/PayPal-Express.git\n"
+  },
+  "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-browserify": "^4.0.1",
+    "grunt-contrib-jshint": "^0.11.3",
+    "grunt-contrib-watch": "^0.6.1",
+    "grunt-mocha-test": "^0.12.7",
+    "grunt-mozu-appdev-sync": "^0.5.5",
+    "load-grunt-tasks": "^3.3.0",
+    "mocha": "^2.3.3",
+    "mozu-action-helpers": "^0.3.4",
+    "mozu-action-simulator": "^1.5.0",
+    "time-grunt": "^1.2.1"
+  },
+  "dependencies": {
+    "mozu-node-sdk": "^1.18.15223-2",
+    "needle": "^0.10.0",
+    "underscore": "^1.8.3",
+    "xml2js": "^0.4.12"
+  }
+}
