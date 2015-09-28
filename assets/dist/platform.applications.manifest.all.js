@@ -148,7 +148,7 @@ module.exports = function(context, callback) {
   		callback(e);
   	}
 };
-},{"../../Utils/constants":1,"mozu-action-helpers/installers/actions":14,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":48,"mozu-node-sdk/clients/platform/tenant":52,"mozu-node-sdk/constants":53,"underscore":79}],3:[function(require,module,exports){
+},{"../../Utils/constants":1,"mozu-action-helpers/installers/actions":14,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":48,"mozu-node-sdk/clients/platform/tenant":49,"mozu-node-sdk/constants":50,"underscore":76}],3:[function(require,module,exports){
 module.exports = {
   
   'embedded.platform.applications.install': {
@@ -6054,8 +6054,68 @@ module.exports = {
   current: "1.18.15231.5"
 };
 },{}],47:[function(require,module,exports){
-arguments[4][15][0].apply(exports,arguments)
-},{"./constants":53,"./plugins/in-memory-auth-cache":62,"./utils/get-config":66,"./utils/make-method":67,"./utils/normalize-context":69,"./utils/sub":75,"./utils/tiny-extend":76,"dup":15}],48:[function(require,module,exports){
+var extend = require('./utils/tiny-extend'),
+    sub = require('./utils/sub'),
+    constants = require('./constants'),
+    makeMethod = require('./utils/make-method'),
+    getConfig = require('./utils/get-config'),
+    normalizeContext = require('./utils/normalize-context'),
+    inMemoryAuthCache = require('./plugins/in-memory-auth-cache'),
+    versionKey = constants.headers.VERSION,
+    version = constants.version;
+
+
+function makeClient(clientCls) {
+  return function(cfg) {
+    return new clientCls(extend({}, this, cfg));
+  };
+}
+
+function cloneContext(ctx) {
+  var newCtx;
+  if (!ctx) return {};
+  try {
+    newCtx = JSON.parse(JSON.stringify(ctx));
+  } catch(e) {
+    throw new Error('Could not serialize context when creating Client. Do not assign non-serializable objects to the client.context.');
+  }
+  newCtx[versionKey] = newCtx[versionKey] || version;
+  return newCtx;
+}
+
+function isContextSufficient(context) {
+  return context && context.appKey && context.sharedSecret && context.baseUrl;
+}
+
+function Client(cfg) {
+  cfg = cfg || {};
+  var context = normalizeContext(cfg.apiContext || cfg.context || {});
+  if (!isContextSufficient(context)) {
+    context = context ? extend(getConfig(), context) : getConfig();
+  }
+  this.context = cloneContext(context);
+  this.defaultRequestOptions = extend({}, Client.defaultRequestOptions, cfg.defaultRequestOptions);
+  if (cfg.plugins) {
+    this.plugins = cfg.plugins.slice();
+    this.plugins.forEach(function(p) {
+      p(this);
+    }.bind(this));
+  }
+  this.authenticationStorage = this.authenticationStorage || inMemoryAuthCache(this);
+}
+
+// statics
+extend(Client, {
+  defaultRequestOptions: {},
+  method: makeMethod,
+  sub: function(methods) {
+    return makeClient(sub(Client, methods));
+  },
+  constants: constants
+});
+
+module.exports = Client;
+},{"./constants":50,"./plugins/in-memory-auth-cache":59,"./utils/get-config":63,"./utils/make-method":64,"./utils/normalize-context":66,"./utils/sub":72,"./utils/tiny-extend":73}],48:[function(require,module,exports){
 
 
 //------------------------------------------------------------------------------
@@ -6089,66 +6149,223 @@ module.exports = Client.sub({
 });
 
 },{"../../../../client":47}],49:[function(require,module,exports){
-arguments[4][16][0].apply(exports,arguments)
-},{"../../../client":47,"dup":16}],50:[function(require,module,exports){
-arguments[4][17][0].apply(exports,arguments)
-},{"../../../client":47,"dup":17}],51:[function(require,module,exports){
-arguments[4][18][0].apply(exports,arguments)
-},{"../../../client":47,"dup":18}],52:[function(require,module,exports){
 arguments[4][19][0].apply(exports,arguments)
-},{"../../client":47,"dup":19}],53:[function(require,module,exports){
+},{"../../client":47,"dup":19}],50:[function(require,module,exports){
 arguments[4][21][0].apply(exports,arguments)
-},{"./version":78,"dup":21}],54:[function(require,module,exports){
+},{"./version":75,"dup":21}],51:[function(require,module,exports){
 arguments[4][22][0].apply(exports,arguments)
-},{"dup":22}],55:[function(require,module,exports){
+},{"dup":22}],52:[function(require,module,exports){
 arguments[4][23][0].apply(exports,arguments)
-},{"../lib/Promise":56,"../lib/decorators/unhandledRejection":58,"dup":23}],56:[function(require,module,exports){
+},{"../lib/Promise":53,"../lib/decorators/unhandledRejection":55,"dup":23}],53:[function(require,module,exports){
 arguments[4][24][0].apply(exports,arguments)
-},{"./Scheduler":57,"./env":59,"./makePromise":61,"dup":24}],57:[function(require,module,exports){
+},{"./Scheduler":54,"./env":56,"./makePromise":58,"dup":24}],54:[function(require,module,exports){
 arguments[4][25][0].apply(exports,arguments)
-},{"dup":25}],58:[function(require,module,exports){
+},{"dup":25}],55:[function(require,module,exports){
 arguments[4][26][0].apply(exports,arguments)
-},{"../env":59,"../format":60,"dup":26}],59:[function(require,module,exports){
+},{"../env":56,"../format":57,"dup":26}],56:[function(require,module,exports){
 arguments[4][27][0].apply(exports,arguments)
-},{"dup":27}],60:[function(require,module,exports){
+},{"dup":27}],57:[function(require,module,exports){
 arguments[4][28][0].apply(exports,arguments)
-},{"dup":28}],61:[function(require,module,exports){
+},{"dup":28}],58:[function(require,module,exports){
 arguments[4][29][0].apply(exports,arguments)
-},{"dup":29}],62:[function(require,module,exports){
+},{"dup":29}],59:[function(require,module,exports){
 arguments[4][30][0].apply(exports,arguments)
-},{"assert":4,"dup":30}],63:[function(require,module,exports){
-arguments[4][31][0].apply(exports,arguments)
-},{"../clients/platform/adminuser/tenantAdminUserAuthTicket":49,"../clients/platform/applications/authTicket":50,"../clients/platform/developer/developerAdminUserAuthTicket":51,"../constants":53,"./auth-ticket":64,"dup":31,"when/es6-shim/Promise.browserify-es6":55}],64:[function(require,module,exports){
+},{"assert":4,"dup":30}],60:[function(require,module,exports){
+/* global Promise */
+'use strict';
+var constants = require('../constants'),
+    AuthTicket = require('./auth-ticket'),
+    scopes = constants.scopes;
+
+if (typeof Promise !== "function") require('when/es6-shim/Promise.browserify-es6');
+
+function createMemoizedClientFactory(clientPath) {
+  var c;
+  return function() {
+    return (c || (c = require(clientPath))).apply(this, arguments);
+  };
+}
+
+var makeAppAuthClient = createMemoizedClientFactory('../clients/platform/applications/authTicket');
+var makeDeveloperAuthClient = createMemoizedClientFactory('../clients/platform/developer/developerAdminUserAuthTicket');
+var makeAdminUserAuthClient = createMemoizedClientFactory('../clients/platform/adminuser/tenantAdminUserAuthTicket');
+
+function getPlatformAuthTicket(client) {
+  return makeAppAuthClient(client).authenticateApp({
+    applicationId: client.context.appKey,
+    sharedSecret: client.context.sharedSecret
+  }, {
+    scope: scopes.NONE
+  }).then(AuthTicket);
+}
+
+function refreshPlatformAuthTicket(client, ticket) {
+  return makeAppAuthClient(client).refreshAppAuthTicket({
+    refreshToken: ticket.refreshToken
+  }, {
+    scope: scopes.NONE
+  }).then(AuthTicket);
+}
+
+function getDeveloperAuthTicket(client) {
+  return makeDeveloperAuthClient(client).createDeveloperUserAuthTicket(client.context.developerAccount).then(function(json) {
+    return new AuthTicket(json);
+  });
+}
+
+function refreshDeveloperAuthTicket(client, ticket) {
+  return makeDeveloperAuthClient(client).refreshDeveloperAuthTicket(ticket).then(AuthTicket);
+}
+
+function getAdminUserAuthTicket(client) {
+  return makeAdminUserAuthClient(client).createUserAuthTicket({ tenantId: client.context.tenant }, { 
+    body: client.context.adminUser,
+    scope: constants.scopes.APP_ONLY
+  }).then(function(json) {
+    client.context.user = json.user;
+    return new AuthTicket(json);
+  });
+}
+
+function refreshAdminUserAuthTicket(client, ticket) {
+  return makeAdminUserAuthClient(client).refreshAuthTicket(ticket, {
+    scope: constants.scopes.APP_ONLY
+  }).then(AuthTicket);
+}
+
+var calleeToClaimType = {
+  'addPlatformAppClaims': 'application',
+  'addDeveloperUserClaims': 'developer',
+  'addAdminUserClaims': 'admin-user'
+};
+
+function makeClaimMemoizer(calleeName, requester, refresher, claimHeader) {
+  return function(client) {
+    var cacheAndUpdateClient = function(ticket) {
+      return new Promise(function(resolve) {
+        client.authenticationStorage.set(calleeToClaimType[calleeName], client.context, ticket, function() {
+          client.context[claimHeader] = ticket.accessToken;
+          resolve(client);
+        });
+      });
+    };
+    var op = new Promise(function(resolve) {
+      client.authenticationStorage.get(calleeToClaimType[calleeName], client.context, function(err, ticket) {
+        resolve(ticket);
+      });
+    }).then(function(ticket) {
+      if (!ticket) {
+        return requester(client).then(cacheAndUpdateClient);
+      }
+      if ((new Date(ticket.accessTokenExpiration)) < new Date()) {
+        return refresher(client, ticket).then(cacheAndUpdateClient);
+      }
+      client.context[claimHeader] = ticket.accessToken;
+      return client;
+    });
+    function setRecent() {
+      AuthProvider.addMostRecentUserClaims = AuthProvider[calleeName];
+    }
+    op.then(setRecent, setRecent);
+    return op;
+  };
+}
+
+
+var AuthProvider = {
+
+  addPlatformAppClaims: makeClaimMemoizer('addPlatformAppClaims', getPlatformAuthTicket, refreshPlatformAuthTicket, constants.headers.APPCLAIMS),
+  addDeveloperUserClaims: makeClaimMemoizer('addDeveloperUserClaims', getDeveloperAuthTicket, refreshDeveloperAuthTicket, constants.headers.USERCLAIMS),
+  addAdminUserClaims: makeClaimMemoizer('addAdminUserClaims', getAdminUserAuthTicket, refreshAdminUserAuthTicket, constants.headers.USERCLAIMS),
+  addMostRecentUserClaims: false
+};
+
+module.exports = AuthProvider;
+
+},{"../constants":50,"./auth-ticket":61,"when/es6-shim/Promise.browserify-es6":52}],61:[function(require,module,exports){
 arguments[4][32][0].apply(exports,arguments)
-},{"dup":32}],65:[function(require,module,exports){
+},{"dup":32}],62:[function(require,module,exports){
 arguments[4][33][0].apply(exports,arguments)
-},{"./tiny-extend":76,"dup":33,"util":13}],66:[function(require,module,exports){
+},{"./tiny-extend":73,"dup":33,"util":13}],63:[function(require,module,exports){
 arguments[4][34][0].apply(exports,arguments)
-},{"./tiny-findup":77,"dup":34,"fs":undefined}],67:[function(require,module,exports){
+},{"./tiny-findup":74,"dup":34,"fs":undefined}],64:[function(require,module,exports){
 arguments[4][35][0].apply(exports,arguments)
-},{"./make-url":68,"./prerequisite-manager":71,"./promise-pipeline":72,"./request":73,"./tiny-extend":76,"dup":35}],68:[function(require,module,exports){
-arguments[4][36][0].apply(exports,arguments)
-},{"./tiny-extend":76,"dup":36,"uritemplate":54}],69:[function(require,module,exports){
+},{"./make-url":65,"./prerequisite-manager":68,"./promise-pipeline":69,"./request":70,"./tiny-extend":73,"dup":35}],65:[function(require,module,exports){
+'use strict';
+var uritemplate = require('uritemplate'),
+extend = require('./tiny-extend');
+
+var templateCache = {};
+
+function toKeysUsed(memo, expr) {
+  if (expr.templateText) memo[expr.templateText] = true;
+  return memo;
+}
+
+function ensureTrailingSlash(url) {
+  return (url.charAt(url.length-1) === '/') ? url : (url + '/');
+}
+
+/**
+ * Creates, evaluates based on context, and returns a string URL for a Mozu API request.
+ * @param  {Object} context The context of a client. Should have a `baseUrl` property at minimum.
+ * @param  {string} tpt     A string to be compiled into a UriTemplate. Should be a valid UriTemplate.
+ * @param  {Object} body      An object consisting of the JSON body of the request, to be used to interpolate URL paramters.
+ * @return {string}         A fully qualified URL.
+ */
+module.exports = function makeUrl(client, tpt, body) {
+  var context = client.context,
+    template = templateCache[tpt] && templateCache[tpt].template;
+    if (!template) {
+      template = uritemplate.parse(tpt);
+      templateCache[tpt] = {
+        template: template,
+        keysUsed: template.expressions.reduce(toKeysUsed, {})
+      };
+    }
+    var ctx = extend({
+      homePod: context.baseUrl && ensureTrailingSlash(context.baseUrl),
+      tenantId: context.tenant, // URI templates expect tenantId
+      pciPod: context.basePciUrl && ensureTrailingSlash(context.basePciUrl)
+    }, context, body || {});
+
+  if (ctx.tenantPod) ctx.tenantPod = ensureTrailingSlash(ctx.tenantPod);
+
+  if (!body || !body.hasOwnProperty("version")) delete ctx.version; // don't pass the API version!
+
+  // ensure the correct base url is present
+  var baseVar = template.expressions[0];
+  if (baseVar.operator && baseVar.operator.symbol === '+' && baseVar.varspecs && !ctx[baseVar.varspecs[0].varname]) {
+    throw new Error('Could not make URL from template ' + tpt + '. Your context is missing a ' + baseVar.varspecs[0].varname + '.');
+  } 
+
+  return {
+    url: template.expand(ctx),
+    keysUsed: templateCache[tpt].keysUsed
+  };
+};
+
+},{"./tiny-extend":73,"uritemplate":51}],66:[function(require,module,exports){
 arguments[4][37][0].apply(exports,arguments)
-},{"./tiny-extend":76,"dup":37}],70:[function(require,module,exports){
+},{"./tiny-extend":73,"dup":37}],67:[function(require,module,exports){
 arguments[4][38][0].apply(exports,arguments)
-},{"dup":38}],71:[function(require,module,exports){
+},{"dup":38}],68:[function(require,module,exports){
 arguments[4][39][0].apply(exports,arguments)
-},{"../clients/platform/tenant":52,"../constants":53,"../security/auth-provider":63,"dup":39}],72:[function(require,module,exports){
+},{"../clients/platform/tenant":49,"../constants":50,"../security/auth-provider":60,"dup":39}],69:[function(require,module,exports){
 arguments[4][40][0].apply(exports,arguments)
-},{"dup":40,"when/es6-shim/Promise.browserify-es6":55}],73:[function(require,module,exports){
+},{"dup":40,"when/es6-shim/Promise.browserify-es6":52}],70:[function(require,module,exports){
 arguments[4][41][0].apply(exports,arguments)
-},{"../constants":53,"./errorify":65,"./parse-json-dates":70,"./stream-to-callback":74,"./tiny-extend":76,"dup":41,"http":undefined,"https":undefined,"path":6,"url":11,"when/es6-shim/Promise.browserify-es6":55}],74:[function(require,module,exports){
+},{"../constants":50,"./errorify":62,"./parse-json-dates":67,"./stream-to-callback":71,"./tiny-extend":73,"dup":41,"http":undefined,"https":undefined,"path":6,"url":11,"when/es6-shim/Promise.browserify-es6":52}],71:[function(require,module,exports){
 arguments[4][42][0].apply(exports,arguments)
-},{"dup":42}],75:[function(require,module,exports){
+},{"dup":42}],72:[function(require,module,exports){
 arguments[4][43][0].apply(exports,arguments)
-},{"./tiny-extend":76,"dup":43,"util":13}],76:[function(require,module,exports){
+},{"./tiny-extend":73,"dup":43,"util":13}],73:[function(require,module,exports){
 arguments[4][44][0].apply(exports,arguments)
-},{"dup":44}],77:[function(require,module,exports){
+},{"dup":44}],74:[function(require,module,exports){
 arguments[4][45][0].apply(exports,arguments)
-},{"dup":45,"fs":undefined,"path":6}],78:[function(require,module,exports){
+},{"dup":45,"fs":undefined,"path":6}],75:[function(require,module,exports){
 arguments[4][46][0].apply(exports,arguments)
-},{"dup":46}],79:[function(require,module,exports){
+},{"dup":46}],76:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors

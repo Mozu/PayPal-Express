@@ -4,15 +4,10 @@ module.exports = {
   'embedded.commerce.orders.action.after': {
       actionName:'embedded.commerce.orders.action.after',
       customFunction: require('./domains/commerce.orders/embedded.commerce.orders.action.after')
-   },
-  
-  'http.commerce.orders.setFulFillmentInfo.before': {
-      actionName:'http.commerce.orders.setFulFillmentInfo.before',
-      customFunction: require('./domains/commerce.orders/http.commerce.orders.setFulFillmentInfo.before')
    }
   
 };
-},{"./domains/commerce.orders/embedded.commerce.orders.action.after":2,"./domains/commerce.orders/http.commerce.orders.setFulFillmentInfo.before":3}],2:[function(require,module,exports){
+},{"./domains/commerce.orders/embedded.commerce.orders.action.after":2}],2:[function(require,module,exports){
 /**
  * Implementation for embedded.commerce.orders.action.after
  * This function will receive the following context object:
@@ -148,20 +143,6 @@ module.exports = {
       }
     }
   }
-}
-
- */
-
-module.exports = function(context, callback) {
-  callback();
-};
-},{}],3:[function(require,module,exports){
-/**
- * Implementation for http.commerce.orders.setFulFillmentInfo.before
- * This function will receive the following context object:
-
-{
-  &#34;type&#34;: &#34;mozu.actions.context.http&#34;
 }
 
  */

@@ -6,11 +6,6 @@
       "actionId": "embedded.commerce.orders.action.after"
     },
     {
-      "id": "http.commerce.orders.setFulFillmentInfo.before",
-      "virtualPath": "./dist\\commerce.orders.manifest.all.js",
-      "actionId": "http.commerce.orders.setFulFillmentInfo.before"
-    },
-    {
       "id": "embedded.commerce.payments.action.performPaymentInteraction",
       "virtualPath": "./dist\\commerce.payments.manifest.all.js",
       "actionId": "embedded.commerce.payments.action.performPaymentInteraction"
@@ -24,6 +19,11 @@
       "id": "http.storefront.pages.global.request.before",
       "virtualPath": "./dist\\storefront.manifest.all.js",
       "actionId": "http.storefront.pages.global.request.before"
+    },
+    {
+      "id": "http.storefront.pages.global.request.after",
+      "virtualPath": "./dist\\storefront.manifest.all.js",
+      "actionId": "http.storefront.pages.global.request.after"
     }
   ]
 }

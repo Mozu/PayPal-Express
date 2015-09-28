@@ -9,6 +9,7 @@
  */
 
 var paypal = require('../../paypal/checkout');
+var helper = require('../../paypal/helper');
 
 module.exports = function(context, callback) {
 
@@ -22,16 +23,15 @@ module.exports = function(context, callback) {
 			context.response.body = err;
 			context.response.end();	
 		});
-	} else if (context.request.url.indexOf("/cart") > -1 || context.request.url.indexOf("/checkout") > -1) {
+	} /*else if (context.request.url.indexOf("/cart") > -1 || context.request.url.indexOf("/checkout") > -1) {
 		console.log("Processing paypal checkout");
 
 		var queryString = paypal.parseUrl(context.request);
 		console.log(queryString);
-		if (!queryString.paypalCheckout && 
-			!queryString.payerId && 
-			!queryString.token && 
-			!queryString.id) 
-			callback();
+		var isPaypalCheckout  = (queryString.paypalCheckout === "1" && queryString.PayerId !== ""  && queryString.token !== "" && queryString.id !== "");
+		console.log("is Paypal checkout ", isPaypalCheckout);
+		if (!isPaypalCheckout)  
+			 callback();
 
 		try {
 			paypal.process(context).then(function(data){
@@ -44,6 +44,6 @@ module.exports = function(context, callback) {
 		} catch(e) {
 			callback(err);
 		}
-	} else
+	}*/ else
   		callback();
 };

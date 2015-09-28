@@ -79,7 +79,7 @@ Paypal.prototype.getExpressCheckoutDetails = function(token) {
 };
 
 
-Paypal.prototype.authorizePayment = function(token,payerId, amount, currencyCode) {
+Paypal.prototype.authorizePayment = function(token,payerId,orderNumber, amount, currencyCode) {
 	var self = this;
 	var params = self.params();
 
@@ -88,6 +88,7 @@ Paypal.prototype.authorizePayment = function(token,payerId, amount, currencyCode
 	params.TOKEN = token;
 	params.PAYMENTREQUEST_0_AMT = amount;
 	params.PAYMENTREQUEST_0_CURRENCYCODE = currencyCode;
+	params.PAYMENTREQUEST_0_INVNUM = orderNumber;
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
 
@@ -116,6 +117,27 @@ Paypal.prototype.doCapture = function(token,orderNumber, authorizationId, amount
 	});
 };
 
+
+Paypal.prototype.doRefund = function(transactionId, fullRefund, amount,currencyCode) {
+	var self = this;
+	var params = self.params();
+
+	
+	params.TRANSACTIONID = transactionId;
+	if (!fullRefund) {
+		params.AMT = amount;
+		params.CURRENCYCODE = currencyCode;	
+		params.REFUNDTYPE = "Partial";	
+	} else
+		params.REFUNDTYPE = "Full";	
+	params.METHOD = 'RefundTransaction';
+	console.log("Refund details", params);
+	
+	return self.request(params).then(function(data) {
+		console.log(data);
+		return { correlationId: data.CORRELATIONID, transactionId: data.REFUNDTRANSACTIONID};
+	});
+};
 
 /**
  * Add product for pricing.	
@@ -295,7 +317,9 @@ Paypal.prototype.request = function( params) {
 					var data = querystring.parse(body);
 					if (data.ACK !== 'Success') {
 						console.log("Paypal express error", data);
-						reject('ACK ' + data.ACK + ': ' + data.L_LONGMESSAGE0+' : CorrelationId: '+data.CORRELATIONID+", method: "+params.METHOD);
+						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0, 
+							"correlationId" : data.CORRELATIONID, "method" : params.METHOD,
+							"statusMessage": data.L_SHORTMESSAGE0, "errorCode" : data.L_ERRORCODE0});
 					}
 					else
 						resolve(data);

@@ -1,5 +1,3 @@
-var url = require("url");
-var qs = require("querystring");
 var _ = require("underscore");
 var Paypal = require("./paypalsdk");
 var constants = require("mozu-node-sdk/constants");
@@ -11,16 +9,17 @@ var PaymentSettings = require("mozu-node-sdk/clients/commerce/settings/checkout/
 var OrderPayment = require('mozu-node-sdk/clients/commerce/orders/payment');
 var OrderShipment =  require('mozu-node-sdk/clients/commerce/orders/shipment');
 var generalSettingsClient = require('mozu-node-sdk/clients/commerce/settings/generalSettings');
-var getAppInfo = require('mozu-action-helpers/get-app-info');
+
+var helper = require("./helper");
 //generalSettingsClient.context[constants.headers.USERCLAIMS] = null;
 
 
-function getPaymentFQN(context) {
+/*function getPaymentFQN(context) {
 	console.log(context);
 	console.log(context.apiContext);
 	var appInfo = getAppInfo(context);
 	return appInfo.namespace+"~"+paymentConstants.PAYMENTSETTINGID;
-}
+}*/
 
 function createClientFromContext(client, context, removeClaims) {
   var c = client(context);
@@ -29,7 +28,7 @@ function createClientFromContext(client, context, removeClaims) {
   return c;
 }
 
-function getValue(paymentSetting, key) {
+/*function getValue(paymentSetting, key) {
   var value = _.findWhere(paymentSetting.credentials, {"apiName" : key});
 
     if (!value) {
@@ -38,7 +37,7 @@ function getValue(paymentSetting, key) {
     }
     //console.log("Key: "+key, value.value );
     return value.value;
-}
+}*/
 
 function getInteractionByStatus(interactions, status) {
   return _.find(interactions, function(interaction){
@@ -50,25 +49,28 @@ function getInteractionByStatus(interactions, status) {
 function createNewPayment(context, paymentAction) {
 	var newStatus = { status : paymentConstants.NEW, amount: paymentAction.amount};
 	return newStatus;
-
 }
 
 function authorizePayment(context, paypalClient, paymentAction, payment) {
 	var response =  { amount: paymentAction.amount };
 	var payerId = payment.billingInfo.data.paypal.payerId;
-	return paypalClient.authorizePayment(payment.externalTransactionId,payerId,paymentAction.amount, paymentAction.currencyCode)
-	.then(function(result) {
-		console.log("Paypal auth result", result);
-		response.transactionId = result.transactionId;
-        response.responseCode = 200;
-        response.responseText =  result.correlationId; 
-        response.status =  paymentConstants.AUTHORIZED;
-       
-        return response;
-	}, function(err) {
-		response.status = paymentConstants.FAILED;
-		 response.responseText =  err;
-		 return response;
+	return createClientFromContext(Order, context).getOrder(payment.orderId)
+	.then(function(order) {
+		return paypalClient.authorizePayment(payment.externalTransactionId,payerId,order.orderNumber,
+			paymentAction.amount, paymentAction.currencyCode)
+		.then(function(result) {
+			console.log("Paypal auth result", result);
+			response.transactionId = result.transactionId;
+		    response.responseCode = 200;
+		    response.responseText =  result.correlationId; 
+		    response.status =  paymentConstants.AUTHORIZED;
+		   
+		    return response;
+		}, function(err) {
+			response.status = paymentConstants.FAILED;
+			 response.responseText =  err;
+			 return response;
+		});
 	});
 }
 
@@ -114,6 +116,45 @@ function captureAmount(context, paypalClient,paymentAction, payment) {
 	              responseText: err};
 	    });
   });
+}
+
+
+function creditPayment(context, paypalClient, paymentAction, payment) {
+	var promise = new Promise(function(resolve, reject) {
+      var capturedInteraction = getInteractionByStatus(payment.interactions,paymentConstants.CAPTURED);
+      //var authorizedInteraction = getInteractionByStatus(payment.interactions,paymentConstants.AUTHORIZED);
+      console.log("AWS Refund, previous capturedInteraction", capturedInteraction);
+      if (!capturedInteraction) {
+        resolve({status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment has not been captured to issue refund"});
+      } 
+
+      if (paymentAction.manualGatewayInteraction) {
+        console.log("Manual credit...dont send to Paypal");
+        resolve({amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.CREDITED,
+                transactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId});
+      }
+      
+      var fullRefund = paymentAction.amount === capturedInteraction.amount;
+
+      return paypalClient.doRefund(capturedInteraction.gatewayTransactionId, fullRefund, paymentAction.amount, paymentAction.currencyCode).then(
+       function(refundResult) {
+         console.log(refundResult);
+
+          var response = {
+            status : paymentConstants.CREDITED ,
+            transactionId: refundResult.transactionId,
+            responseCode: 200,
+            amount: paymentAction.amount
+          };
+          console.log("Refund response", response);
+          resolve(response);
+      }, function(err) {
+        console.log("Capture Error", err);
+        resolve({status : paymentConstants.FAILED,responseText: err.statusText,responseCode: err.errorCode});
+      });
+	});
+	
+	return promise;
 }
 
 function voidPayment(context, paymentAction) {
@@ -220,21 +261,14 @@ function processPaymentResult(context,paymentResult, paymentAction) {
   }
 
 var paypalCheckout = module.exports = {
-	parseUrl: function(request) {
-		var urlParseResult = url.parse(request.url);
-		console.log("parsedUrl", urlParseResult);
-		queryStringParams = qs.parse(urlParseResult.query);
-		return queryStringParams;
-
-	},
 	getPaypalClient: function(context) {
 		return createClientFromContext(PaymentSettings, context,true)
-		.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName: getPaymentFQN(context)})
+		.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName: helper.getPaymentFQN(context)})
 		.then(function(paypalSettings) {
-			var userName = getValue(paypalSettings, paymentConstants.USERNAME) || "integrations_api1.mozu.com";
-			var password = getValue(paypalSettings, paymentConstants.PASSWORD) || "AEACMKZ8RB4AVRJX";
-			var signature = getValue(paypalSettings, paymentConstants.SIGNATURE) || "AFcWxV21C7fd0v3bYYYRCpSSRl31Ap69TZ0zGzOgodZ--H-KgVyikW8O";
-			var environment = getValue(paypalSettings, paymentConstants.ENVIRONMENT) || "sandbox";
+			var userName = helper.getValue(paypalSettings, paymentConstants.USERNAME);
+			var password = helper.getValue(paypalSettings, paymentConstants.PASSWORD);
+			var signature = helper.getValue(paypalSettings, paymentConstants.SIGNATURE);
+			var environment = helper.getValue(paypalSettings, paymentConstants.ENVIRONMENT) || "sandbox";
 			return new Paypal.create(userName, password, signature, environment == "sandbox");
 		});
 	},
@@ -249,7 +283,7 @@ var paypalCheckout = module.exports = {
 			return 	{
 				name: item.product.name, 
 				quantity: item.quantity, 
-				amount: item.discountedTotal,
+				amount: item.discountedTotal/item.quantity,
 				lineId: item.lineId
 
 			};
@@ -257,17 +291,21 @@ var paypalCheckout = module.exports = {
 	},
 	convertCartToOrder: function(context, id, isCart) {
 
-		if (isCart)
+		if (isCart) {
+			console.log("Converting cart to order");
 			return createClientFromContext(Order, context).createOrderFromCart({ cartId: id  });
-		else
+		}
+		else {
+			console.log("Getting existing order");
 			return this.getOrder(context, id, isCart);
+		}
 	},
 	setPaymentOptions: function(client) {
 		return client.setPayOptions(1,0,0);
 	},
 	getToken: function(context) {
 		var self = this;
-		var queryString = self.parseUrl(context.request);
+		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
 		var isCart = queryString.isCart;
 		var domain = queryString.domain;
@@ -293,14 +331,13 @@ var paypalCheckout = module.exports = {
 	},
 	process: function(context) {
 		var self = this;
-		var queryString = self.parseUrl(context.request);
+		var queryString = helper.parseUrl(context);
 		
-		//if (!queryString.paypalCheckout && !queryString.payerId && !queryString.token && !queryString.id) return;
-
 		var id = queryString.id;
-		var isCart = context.request.url.indexOf("/cart") > -1;
+		var isCart = helper.isCartPage(context);
 		var token = queryString.token;
 		var payerId = queryString.PayerID;
+		console.log("Processing paypal checkout");
 
 		return self.getPaypalClient(context)
 		.then(function(client) {
@@ -310,6 +347,7 @@ var paypalCheckout = module.exports = {
 				return client.getExpressCheckoutDetails(token)
 				.then( function(paypalOrder) {
 					console.log("Paypal Order details",paypalOrder);
+					console.log("mozu order", order);
 					//if (order.requiresFulfillmentInfo) {
 						console.log("setting fulfillmentInfo");
 						return self.setFulfillmentInfo(context,order.id, paypalOrder)
@@ -428,10 +466,10 @@ var paypalCheckout = module.exports = {
             case "CapturePayment":
                 console.log("Capturing payment for ", payment.externalTransactionId);
                 return captureAmount(context, client, paymentAction, payment);
-            /*case "CreditPayment":
+            case "CreditPayment":
                 console.log("Crediting payment for ", payment.externalTransactionId);
-                return creditPayment(paymentAction, payment);
-            case "DeclinePayment":
+                return creditPayment(context, client, paymentAction, payment);
+            /*case "DeclinePayment":
                 console.log("Decline payment for ",payment.externalTransactionId);
                 return declinePayment(paymentAction, payment);*/
             default:
