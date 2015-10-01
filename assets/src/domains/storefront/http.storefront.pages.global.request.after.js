@@ -18,7 +18,7 @@ function setError(err, context, callback) {
 
 module.exports = function(context, callback) {
   if ( helper.isCartPage(context) || helper.isCheckoutPage(context)) {
-		console.log("Processing paypal checkout");
+		
 
 		//var queryString = helper.parseUrl(context);
 		//console.log(queryString);
@@ -28,9 +28,14 @@ module.exports = function(context, callback) {
 		try {
 			if (!helper.isPayPalCheckout(context))  
 			 callback();
-
+			console.log("Processing paypal checkout");
 			paypal.process(context).then(function(data){
-				context.response.redirect('/checkout/'+data.id);
+				var queryStringParams = helper.parseUrl(context);
+				var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
+				var redirectUrl = '/checkout/'+data.id;
+				if (paramsToPreserve)
+					redirectUrl = redirectUrl + "?"+paramsToPreserve;
+				context.response.redirect(redirectUrl);
         	  	context.response.end();
 
 			}, function(err) {

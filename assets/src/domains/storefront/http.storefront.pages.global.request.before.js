@@ -13,7 +13,7 @@ var helper = require('../../paypal/helper');
 
 module.exports = function(context, callback) {
 
-	if (context.request.url.indexOf("/paypal/token") > -1) {
+	if ( helper.isTokenRequest(context)) {
 		paypal.getToken(context)
 		.then(function(data){
 			context.response.body = data;
