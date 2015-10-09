@@ -7,7 +7,7 @@
 var ActionInstaller = require('mozu-action-helpers/installers/actions');
 var tenantClient = require("mozu-node-sdk/clients/platform/tenant")();
 var constants = require("mozu-node-sdk/constants");
-var paymentConstants = require("../../Utils/constants");
+var paymentConstants = require("../../paypal/constants");
 var _ = require("underscore");
 
 

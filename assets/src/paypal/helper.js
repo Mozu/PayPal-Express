@@ -2,10 +2,19 @@
 var getAppInfo = require('mozu-action-helpers/get-app-info');
 var url = require("url");
 var qs = require("querystring");
-var paymentConstants = require("../utils/constants");
+var paymentConstants = require("./constants");
 var _ = require("underscore");
+var constants = require("mozu-node-sdk/constants");
+var Order = require("mozu-node-sdk/clients/commerce/order");
+var Cart = require("mozu-node-sdk/clients/commerce/cart")();
 
-var paypalCheckout = module.exports = {
+var helper = module.exports = {
+	createClientFromContext: function (client, context, removeClaims) {
+	  var c = client(context);
+	  if (removeClaims)
+		  c.context[constants.headers.USERCLAIMS] = null;
+	  return c;
+	},
 	isTokenRequest: function(context) {
 		 return context.request.url.indexOf("/paypal/token") > -1;
 	},
@@ -16,7 +25,6 @@ var paypalCheckout = module.exports = {
 		return context.request.url.indexOf("/checkout") > -1;
 	},
 	parseHref: function(context) {
-		console.log(context.request);
 		var urlParseResult = url.parse(context.request.href);
 		console.log("parsedUrl", urlParseResult);
 		return urlParseResult;
@@ -34,7 +42,6 @@ var paypalCheckout = module.exports = {
 			queryString.token !== "" && (queryString.id !== "" || this.isCheckoutPage(context)) );
 	},
 	getPaymentFQN: function(context) {
-		console.log(context.apiContext);
 		var appInfo = getAppInfo(context);
 		return appInfo.namespace+"~"+paymentConstants.PAYMENTSETTINGID;
 	},
@@ -61,5 +68,112 @@ var paypalCheckout = module.exports = {
 			queryString += key +"=" + params[key];
 		});
         return queryString;
-    }
+    },
+    getStoreCredits: function(order) {
+		var storeCredits = _.filter(order.payments,function(payment) {return (payment.paymentType === "StoreCredit" || payment.paymentType === "GiftCard"); });
+		return _.map(storeCredits , function(credit) {
+						return {
+							name: credit.paymentType,
+							quantity: 1,
+							amount: -credit.amountRequested
+						};
+					}) ;
+	},
+    getActiveDiscountItems: function(discounts) {
+		var activeDiscounts = _.filter(discounts, function(discount) { return discount.excluded === false;});
+		if (activeDiscounts.length === 0)
+			activeDiscounts = _.filter(discounts, function(discount) { return discount.discount.excluded === false; });
+
+		return 	_.map( activeDiscounts , function(discount) {
+			return {
+				name: discount.discount.name || discount.discount.discount.name,
+				quantity: 1,
+				amount: -discount.impact || -discount.discount.impact
+			};
+		});
+	},
+    getItems: function (order, includeStoreCredits) {
+    	var self = this;
+		var items=	_.map(order.items, function(item) {
+			return 	{
+				name: item.product.name, 
+				quantity: item.quantity, 
+				amount: item.discountedTotal/item.quantity,
+				lineId: item.lineId,
+				taxAmount: item.itemTaxTotal
+			};
+		});
+
+		if (order.orderDiscounts) {
+			items = _.union(items, self.getActiveDiscountItems(order.orderDiscounts));
+		}
+
+
+		/*if (order.shippingDiscounts) {
+			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));	
+		}*/
+
+		if (order.handlingDiscount) {
+			items = _.union(items, self.getActiveDiscountItems(order.handlingDiscount));
+		}
+
+		//if (includeStoreCredits) {
+			var storeCredits = self.getStoreCredits(order);
+			if (storeCredits.length > 0) {
+				items = _.union(items,storeCredits);
+			}
+		//}
+
+		return items;
+
+	},
+	getShippingDiscountAmount: function (order) {
+		var items = this.getActiveDiscountItems(order.shippingDiscounts);
+		return _.reduce(items, function(sum, item) {return sum+item.amount;},0);
+	},
+	getOrderDetails: function(order, includeShipping, paymentAction) {
+		var self = this;
+		var orderDetails = {
+			taxAmount: order.taxTotal,
+			handlingAmount: order.handlingTotal,
+			shippingAmount: order.shippingTotal,
+			shippingDiscount: self.getShippingDiscountAmount(order),
+			items: self.getItems(order, false)
+		}; 
+
+		if (paymentAction) {
+			orderDetails.amount = paymentAction.amount;
+			orderDetails.currencyCode = paymentAction.currencyCode;
+			orderDetails.orderNumber = order.orderNumber;
+		} else {
+			var storeCredits = self.getStoreCredits(order);
+			var storeCreditTotal = _.reduce(storeCredits, function(sum, item) {return sum+item.amount;},0);
+			orderDetails.amount = order.total+storeCreditTotal;
+			orderDetails.currencyCode = order.currencyCode;
+		}
+
+		if (includeShipping) 
+			orderDetails.email = order.email;
+
+		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
+			orderDetails.shippingAddress = {
+				firstName: order.fulfillmentInfo.fulfillmentContact.firstName,
+				lastName: order.fulfillmentInfo.fulfillmentContact.lastNameOrSurname,
+				address1: order.fulfillmentInfo.fulfillmentContact.address.address1,
+				address2: order.fulfillmentInfo.fulfillmentContact.address.address2,
+				cityOrTown: order.fulfillmentInfo.fulfillmentContact.address.cityOrTown,
+				stateOrProvince: order.fulfillmentInfo.fulfillmentContact.address.stateOrProvince,
+				postalOrZipCode: order.fulfillmentInfo.fulfillmentContact.address.postalOrZipCode,
+				countryCode: order.fulfillmentInfo.fulfillmentContact.address.countryCode,
+				phone: order.fulfillmentInfo.fulfillmentContact.phoneNumbers.home
+			};
+		}
+		return orderDetails;
+	},
+	getOrder: function(context, id, isCart) {
+		if (isCart)
+			return Cart.getCart({cartId: id});
+		else
+			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});	
+	}
 };

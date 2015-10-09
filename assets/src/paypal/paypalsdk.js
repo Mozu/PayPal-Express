@@ -50,6 +50,49 @@ function prepareNumber(num, doubleZero) {
 }
 
 
+Paypal.prototype.setOrderParams = function(order) {
+	var self = this;
+	var params = self.params();
+	if (order.email) {
+		params.EMAIL = order.email;
+	}
+	params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
+	if (order.orderNumber)
+		params.PAYMENTREQUEST_0_INVNUM = order.orderNumber;
+
+	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
+	if (order.taxAmount)
+		params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
+	if (order.handlingAmount)
+		params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(order.handlingAmount);
+	if (order.shippingAmount)
+		params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
+
+	if (order.shippingDiscount)
+		params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);		
+
+	if (order.items) {
+		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(order.items, function(sum, item) {return sum+(item.amount*item.quantity);},0));
+		self.setProducts(order.items);
+		params = _.extend(params, this.getItemsParams());	
+	}
+
+	if (order.shippingAddress) {
+		//params.ADDROVERRIDE = 1;
+		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
+		params.PAYMENTREQUEST_0_SHIPTOSTREET = order.shippingAddress.address1;
+		if (order.shippingAddress.address2) 
+			params.PAYMENTREQUEST_0_SHIPTOSTREET2 = order.shippingAddress.address2;
+		params.PAYMENTREQUEST_0_SHIPTOCITY = order.shippingAddress.cityOrTown;
+		params.PAYMENTREQUEST_0_SHIPTOSTATE = order.shippingAddress.stateOrProvince;
+		params.PAYMENTREQUEST_0_SHIPTOZIP = order.shippingAddress.postalOrZipCode;
+		params.PAYMENTREQUEST_0_SHIPTOCOUNTRYCODE = order.shippingAddress.countryCode;
+		params.PAYMENTREQUEST_0_SHIPTOPHONENUM = order.shippingAddress.phone;
+	}
+
+	return params;
+};
+
 Paypal.prototype.getExpressCheckoutDetails = function(token) {
 	var self = this;
 	var params = self.params();
@@ -61,30 +104,66 @@ Paypal.prototype.getExpressCheckoutDetails = function(token) {
 	return self.request(params);
 };
 
+Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUrl) {
+	var self = this;
+	
+	
+	var params = self.setOrderParams(order);
+	/*params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
+	//params.PAYMENTREQUEST_0_DESC = description;
+	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
+	
+	if (order.taxAmount)
+		params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
+	if (order.handlingAmount)
+		params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(order.handlingAmount);
+	if (order.shippingAmount)
+		params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
+	//params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(odder.amount);
+
+	if (order.items) {
+		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(orderDetails.items, function(sum, item) {return sum+item.amount;},0));
+		self.setProducts(order.items);
+		params = _.extend(params, this.getItemsParams());	
+	}*/
+	
+
+	params.PAYMENTREQUEST_0_PAYMENTACTION = 'Authorization';
+
+
+	params.RETURNURL = returnUrl;
+	params.CANCELURL = cancelUrl;
+
+	params.NOSHIPPING = 1;
+	params.ALLOWNOTE = 1;
+	params.REQCONFIRMSHIPPING = 0;
+	params.METHOD = 'SetExpressCheckout';
+
+	params = _.extend(params, this.payOptions);
+	console.log("set express checkout request", params);
+	return self.request(params).then(function(data) {
+		console.log("Set express checkout",data);
+			return { 
+				redirectUrl: self.redirect + '?cmd=_express-checkout&useraction=commit&token=' + data.TOKEN, 
+				token: data.TOKEN,
+				correlationId: data.CORRELATIONID
+			};
+	});
+};
+
 
 Paypal.prototype.authorizePayment = function(orderDetails) {
 	var self = this;
-	var params = self.params();
+	var params = self.setOrderParams(orderDetails);
 
 	
 	params.PAYERID = orderDetails.payerId;
 	params.TOKEN = orderDetails.token;
-	params.PAYMENTREQUEST_0_AMT = prepareNumber(orderDetails.amount);
-	params.PAYMENTREQUEST_0_CURRENCYCODE = orderDetails.currencyCode;
-	params.PAYMENTREQUEST_0_INVNUM = orderDetails.orderNumber;
-	params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(orderDetails.taxAmount);
-	params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(orderDetails.handlingAmount);
-	params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(orderDetails.shippingAmount);
-	
 
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
 
-	if (orderDetails.items) {
-		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(orderDetails.items, function(sum, item) {return sum+item.amount;},0));
-		self.setProducts(orderDetails.items);
-		params = _.extend(params, self.getItemsParams());
-	}
+	
 	console.log("authorize payment",params);
 
 	return self.request(params).then(function(data) {
@@ -182,56 +261,6 @@ Paypal.prototype.getItemsParams = function() {
 	return params;
 };
 
-Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUrl) {
-	var self = this;
-	var params = self.params();
-	if (order.email) {
-		params.EMAIL = order.email;
-	}
-
-	params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
-	//params.PAYMENTREQUEST_0_DESC = description;
-	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
-	params.PAYMENTREQUEST_0_PAYMENTACTION = 'Authorization';
-	//params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(odder.amount);
-
-	if (order.items) {
-		self.setProducts(order.items);
-		params = _.extend(params, this.getItemsParams());	
-	}
-	
-	if (order.shippingAddress) {
-		//params.ADDROVERRIDE = 1;
-		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
-		params.PAYMENTREQUEST_0_SHIPTOSTREET = order.shippingAddress.address1;
-		if (order.shippingAddress.address2) 
-			params.PAYMENTREQUEST_0_SHIPTOSTREET2 = order.shippingAddress.address2;
-		params.PAYMENTREQUEST_0_SHIPTOCITY = order.shippingAddress.cityOrTown;
-		params.PAYMENTREQUEST_0_SHIPTOSTATE = order.shippingAddress.stateOrProvince;
-		params.PAYMENTREQUEST_0_SHIPTOZIP = order.shippingAddress.postalOrZipCode;
-		params.PAYMENTREQUEST_0_SHIPTOCOUNTRYCODE = order.shippingAddress.countryCode;
-		params.PAYMENTREQUEST_0_SHIPTOPHONENUM = order.shippingAddress.phone;
-	}
-
-	params.RETURNURL = returnUrl;
-	params.CANCELURL = cancelUrl;
-
-	params.NOSHIPPING = 1;
-	params.ALLOWNOTE = 1;
-	params.REQCONFIRMSHIPPING = 0;
-	params.METHOD = 'SetExpressCheckout';
-
-	params = _.extend(params, this.payOptions);
-	console.log("set express checkout request", params);
-	return self.request(params).then(function(data) {
-		console.log("Set express checkout",data);
-			return { 
-				redirectUrl: self.redirect + '?cmd=_express-checkout&useraction=commit&token=' + data.TOKEN, 
-				token: data.TOKEN,
-				correlationId: data.CORRELATIONID
-			};
-	});
-};
 
 Paypal.prototype.doExpressCheckoutPayment = function(params) {
 	var self = this;

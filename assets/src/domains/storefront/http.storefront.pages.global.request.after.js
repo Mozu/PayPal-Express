@@ -17,14 +17,7 @@ function setError(err, context, callback) {
 }
 
 module.exports = function(context, callback) {
-  if ( helper.isCartPage(context) || helper.isCheckoutPage(context)) {
-		
-
-		//var queryString = helper.parseUrl(context);
-		//console.log(queryString);
-		//var isPaypalCheckout  = (queryString.paypalCheckout === "1" && queryString.PayerId !== ""  && queryString.token !== "" && queryString.id !== "");
-		//console.log("is Paypal checkout ", isPaypalCheckout);
-
+  /*if ( helper.isCartPage(context) || helper.isCheckoutPage(context)) {
 		try {
 			if (!helper.isPayPalCheckout(context))  
 			 callback();
@@ -44,7 +37,7 @@ module.exports = function(context, callback) {
 		} catch(e) {
 			setError(e,context,callback);
 		}
-	} else {
+	} else {*/
 		callback();
-	}
+	//}
 };

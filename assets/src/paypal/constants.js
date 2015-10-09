@@ -1,5 +1,5 @@
 module.exports = {
-	PAYMENTSETTINGID : "PayPalExpressNew",
+	PAYMENTSETTINGID : "PayPalExpress2",
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
