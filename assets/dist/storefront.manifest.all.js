@@ -486,7 +486,7 @@ var helper = module.exports = {
         return queryString;
     },
     getStoreCredits: function(order) {
-		var storeCredits = _.filter(order.payments,function(payment) {return (payment.paymentType === "StoreCredit" || payment.paymentType === "GiftCard"); });
+		var storeCredits = _.filter(order.payments,function(payment) {return ((payment.paymentType === "StoreCredit" || payment.paymentType === "GiftCard") && payment.status != "Voided"); });
 		return _.map(storeCredits , function(credit) {
 						return {
 							name: credit.paymentType,
@@ -515,8 +515,8 @@ var helper = module.exports = {
 				name: item.product.name, 
 				quantity: item.quantity, 
 				amount: item.discountedTotal/item.quantity,
-				lineId: item.lineId,
-				taxAmount: item.itemTaxTotal
+				lineId: item.lineId//,
+				//taxAmount: item.itemTaxTotal
 			};
 		});
 
@@ -564,7 +564,7 @@ var helper = module.exports = {
 		} else {
 			var storeCredits = self.getStoreCredits(order);
 			var storeCreditTotal = _.reduce(storeCredits, function(sum, item) {return sum+item.amount;},0);
-			orderDetails.amount = order.total+storeCreditTotal;
+			orderDetails.amount = ((((order.total+storeCreditTotal)+0.00001) * 100) / 100);
 			orderDetails.currencyCode = order.currencyCode;
 		}
 
@@ -701,16 +701,6 @@ module.exports = {
 	    context.exec.addPaymentInteraction(interaction);
 
 
-
-	    /*if (paymentResult.captureOnAuthorize) {
-	      interaction.gatewayTransactionId = paymentResult.captureResult.captureId;
-	      interaction.status = paymentResult.captureResult.status;
-	      interaction.interactionType = "Capture";
-	      interaction.responseText = paymentResult.captureResult.responseText;
-	      interaction.gatewayResponseCode= paymentResult.captureResult.responseCode;
-	      context.exec.addPaymentInteraction(interaction);
-	    }*/
-
 	    if (paymentResult.status == paymentConstants.CAPTURED)
 	      context.exec.setPaymentAmountCollected(paymentResult.amount);
   	},
@@ -721,6 +711,7 @@ module.exports = {
 			var details = helper.getOrderDetails(order,false, paymentAction);
 			details.token= payment.externalTransactionId;
 			details.payerId= payerId;
+
 			return details;
 		}).then(function(order){
 			console.log(order);

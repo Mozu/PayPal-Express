@@ -104,16 +104,6 @@ module.exports = {
 	    context.exec.addPaymentInteraction(interaction);
 
 
-
-	    /*if (paymentResult.captureOnAuthorize) {
-	      interaction.gatewayTransactionId = paymentResult.captureResult.captureId;
-	      interaction.status = paymentResult.captureResult.status;
-	      interaction.interactionType = "Capture";
-	      interaction.responseText = paymentResult.captureResult.responseText;
-	      interaction.gatewayResponseCode= paymentResult.captureResult.responseCode;
-	      context.exec.addPaymentInteraction(interaction);
-	    }*/
-
 	    if (paymentResult.status == paymentConstants.CAPTURED)
 	      context.exec.setPaymentAmountCollected(paymentResult.amount);
   	},
@@ -124,6 +114,7 @@ module.exports = {
 			var details = helper.getOrderDetails(order,false, paymentAction);
 			details.token= payment.externalTransactionId;
 			details.payerId= payerId;
+
 			return details;
 		}).then(function(order){
 			console.log(order);

@@ -70,7 +70,7 @@ var helper = module.exports = {
         return queryString;
     },
     getStoreCredits: function(order) {
-		var storeCredits = _.filter(order.payments,function(payment) {return (payment.paymentType === "StoreCredit" || payment.paymentType === "GiftCard"); });
+		var storeCredits = _.filter(order.payments,function(payment) {return ((payment.paymentType === "StoreCredit" || payment.paymentType === "GiftCard") && payment.status != "Voided"); });
 		return _.map(storeCredits , function(credit) {
 						return {
 							name: credit.paymentType,
@@ -99,8 +99,8 @@ var helper = module.exports = {
 				name: item.product.name, 
 				quantity: item.quantity, 
 				amount: item.discountedTotal/item.quantity,
-				lineId: item.lineId,
-				taxAmount: item.itemTaxTotal
+				lineId: item.lineId//,
+				//taxAmount: item.itemTaxTotal
 			};
 		});
 
@@ -148,7 +148,7 @@ var helper = module.exports = {
 		} else {
 			var storeCredits = self.getStoreCredits(order);
 			var storeCreditTotal = _.reduce(storeCredits, function(sum, item) {return sum+item.amount;},0);
-			orderDetails.amount = order.total+storeCreditTotal;
+			orderDetails.amount = ((((order.total+storeCreditTotal)+0.00001) * 100) / 100);
 			orderDetails.currencyCode = order.currencyCode;
 		}
 
