@@ -36,7 +36,7 @@ In order to work with Arc.js, you'll need to have:
     - The application key for the app you just created
     - Your Developer Center login
     - The Application Key and Shared Secret for your sync app
-   Got all those? OK, in your `AmazonPay` directory you cloned from Git, run:
+   Got all those? OK, in your `PayPal-Express` directory you cloned from Git, run:
    ```sh
    $ yo mozu-app --config
    ```
@@ -59,7 +59,7 @@ In order to work with Arc.js, you'll need to have:
 
 ## Installing Arc.js Actions
 
-Now that you've uploaded the code to your AmazonPay app, it's ready to install in your sandbox! In the top right of the app details page for your Achievements app, there is an "Install" button. Click it, and in the ensuing dialog, select your sandbox. Click "Install"!
+Now that you've uploaded the code to your PayPal Express Checkout app, it's ready to install in your sandbox! In the top right of the app details page for your Achievements app, there is an "Install" button. Click it, and in the ensuing dialog, select your sandbox. Click "Install"!
 
 *If the install process fails at this point, check with Mozu Support to make sure that the Arc.js framework is enabled for your sandbox.*
 
