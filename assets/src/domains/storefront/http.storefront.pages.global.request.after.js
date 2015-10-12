@@ -17,27 +17,10 @@ function setError(err, context, callback) {
 }
 
 module.exports = function(context, callback) {
-  /*if ( helper.isCartPage(context) || helper.isCheckoutPage(context)) {
-		try {
-			if (!helper.isPayPalCheckout(context))  
-			 callback();
-			console.log("Processing paypal checkout");
-			paypal.process(context).then(function(data){
-				var queryStringParams = helper.parseUrl(context);
-				var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
-				var redirectUrl = '/checkout/'+data.id;
-				if (paramsToPreserve)
-					redirectUrl = redirectUrl + "?"+paramsToPreserve;
-				context.response.redirect(redirectUrl);
-        	  	context.response.end();
-
-			}, function(err) {
-				setError(err,context, callback);
-			});
-		} catch(e) {
-			setError(e,context,callback);
-		}
-	} else {*/
-		callback();
-	//}
+	var paypalError = context.cache.request.get("paypalError");
+	if (paypalError) {
+		console.log("Adding paypal error to viewData", paypalError);
+		context.response.viewData.paypalError = paypalError;
+	}
+	callback();
 };

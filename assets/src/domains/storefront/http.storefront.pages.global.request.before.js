@@ -13,8 +13,8 @@ var helper = require('../../paypal/helper');
 
 function setError(err, context, callback) {
 	console.log(err);
-	//context.response.viewData.paypalError = err;
-	callback(err);
+	context.cache.request.set("paypalError", err);
+	callback();
 }
 
 module.exports = function(context, callback) {

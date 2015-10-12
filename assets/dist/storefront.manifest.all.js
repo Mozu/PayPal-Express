@@ -18,29 +18,12 @@ function setError(err, context, callback) {
 }
 
 module.exports = function(context, callback) {
-  /*if ( helper.isCartPage(context) || helper.isCheckoutPage(context)) {
-		try {
-			if (!helper.isPayPalCheckout(context))  
-			 callback();
-			console.log("Processing paypal checkout");
-			paypal.process(context).then(function(data){
-				var queryStringParams = helper.parseUrl(context);
-				var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
-				var redirectUrl = '/checkout/'+data.id;
-				if (paramsToPreserve)
-					redirectUrl = redirectUrl + "?"+paramsToPreserve;
-				context.response.redirect(redirectUrl);
-        	  	context.response.end();
-
-			}, function(err) {
-				setError(err,context, callback);
-			});
-		} catch(e) {
-			setError(e,context,callback);
-		}
-	} else {*/
-		callback();
-	//}
+	var paypalError = context.cache.request.get("paypalError");
+	if (paypalError) {
+		console.log("Adding paypal error to viewData", paypalError);
+		context.response.viewData.paypalError = paypalError;
+	}
+	callback();
 };
 },{"../../paypal/checkout":3,"../../paypal/helper":5}],2:[function(require,module,exports){
 /**
@@ -58,8 +41,8 @@ var helper = require('../../paypal/helper');
 
 function setError(err, context, callback) {
 	console.log(err);
-	//context.response.viewData.paypalError = err;
-	callback(err);
+	context.cache.request.set("paypalError", err);
+	callback();
 }
 
 module.exports = function(context, callback) {
@@ -271,6 +254,10 @@ var paypalCheckout = module.exports = {
 		}).then(function(response) {
 			var client = paymentHelper.getPaypalClient(response.config);
 			client.setPayOptions(1,0,0);
+			console.log("configuration", context.configuration);
+			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
+				response.order.maxAmount = context.configuration.paypal.setExpressCheckout.maxAmount;
+
 			console.log(response.order);
 			return client.setExpressCheckoutPayment(
 					response.order,
@@ -319,6 +306,9 @@ var paypalCheckout = module.exports = {
 		}).then(function(response) {
 			//get Paypal order details
 			var client = paymentHelper.getPaypalClient(response.config);
+			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
+				token = context.configuration.paypal.getExpressCheckoutDetails.token;
+			
 			return client.getExpressCheckoutDetails(token).
 			then(function(paypalOrder) {
 				console.log("Paypal order", paypalOrder);
@@ -712,10 +702,14 @@ module.exports = {
 			details.token= payment.externalTransactionId;
 			details.payerId= payerId;
 
+
 			return details;
 		}).then(function(order){
 			console.log(order);
 			var client = self.getPaypalClient(config);
+			if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
+				order.amount = context.configuration.paypal.authorization.amount;
+
 			return client.authorizePayment(order).
 				then(function(result) {
 					return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
@@ -725,14 +719,12 @@ module.exports = {
 		}).then(function(authResult) {
 			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT)
 				return authResult;
-
 			//Capture payment
 			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
 
 			return self.captureAmount(context, config, paymentAction, payment)
 					.then(function(captureResult) {
 						captureResult.captureOnAuthorize = true;
-						//authResult.captureResult = captureResult;
 						return captureResult;
 					});
 		}).catch(function(err) {
@@ -765,6 +757,10 @@ module.exports = {
 		      return response;
 		    }
 		    var client = self.getPaypalClient(config);
+
+		    if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
+				paymentAction.amount = context.configuration.paypal.capture.amount;
+
 		    return client.doCapture(payment.externalTransactionId,order.orderNumber,
 		    								paymentAuthorizationInteraction.gatewayTransactionId, 
 		    								paymentAction.amount, paymentAction.currencyCode)
@@ -796,6 +792,10 @@ module.exports = {
 	      
 	      var fullRefund = paymentAction.amount === capturedInteraction.amount;
 	      var client = self.getPaypalClient(config);
+
+		  if (context.configuration && context.configuration.paypal && context.configuration.paypal.refund)
+			paymentAction.amount = context.configuration.paypal.refund.amount;
+
 	      return client.doRefund(capturedInteraction.gatewayTransactionId, fullRefund, paymentAction.amount, paymentAction.currencyCode).then(
 	       function(refundResult) {
 	       		resolve(self.getPaymentResult(refundResult,paymentConstants.CREDITED, paymentAction.amount));
@@ -826,6 +826,10 @@ module.exports = {
 			if (!authorizedInteraction) 
 			  resolve( {status: paymentConstants.VOIDED, amount: paymentAction.amount});
 			var client = self.getPaypalClient(config);
+
+			if (context.configuration && context.configuration.paypal && context.configuration.paypal.void)
+				pauthorizedInteraction.gatewayTransactionId = context.configuration.paypal.void.authorizationId;
+
 			return client.doVoid(authorizedInteraction.gatewayTransactionId).then(
 				function(result) {
 					resolve(self.getPaymentResult(result,paymentConstants.VOIDED, paymentAction.amount ));
@@ -918,6 +922,9 @@ Paypal.prototype.setOrderParams = function(order) {
 		self.setProducts(order.items);
 		params = _.extend(params, this.getItemsParams());	
 	}
+
+	if (order.maxAmount)
+		params.MAXAMT = order.maxAmount;
 
 	if (order.shippingAddress) {
 		//params.ADDROVERRIDE = 1;

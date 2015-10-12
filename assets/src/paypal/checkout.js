@@ -170,6 +170,10 @@ var paypalCheckout = module.exports = {
 		}).then(function(response) {
 			var client = paymentHelper.getPaypalClient(response.config);
 			client.setPayOptions(1,0,0);
+			console.log("configuration", context.configuration);
+			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
+				response.order.maxAmount = context.configuration.paypal.setExpressCheckout.maxAmount;
+
 			console.log(response.order);
 			return client.setExpressCheckoutPayment(
 					response.order,
@@ -218,6 +222,9 @@ var paypalCheckout = module.exports = {
 		}).then(function(response) {
 			//get Paypal order details
 			var client = paymentHelper.getPaypalClient(response.config);
+			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
+				token = context.configuration.paypal.getExpressCheckoutDetails.token;
+			
 			return client.getExpressCheckoutDetails(token).
 			then(function(paypalOrder) {
 				console.log("Paypal order", paypalOrder);

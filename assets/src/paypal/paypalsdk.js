@@ -77,6 +77,9 @@ Paypal.prototype.setOrderParams = function(order) {
 		params = _.extend(params, this.getItemsParams());	
 	}
 
+	if (order.maxAmount)
+		params.MAXAMT = order.maxAmount;
+
 	if (order.shippingAddress) {
 		//params.ADDROVERRIDE = 1;
 		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
