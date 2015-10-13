@@ -1,48 +1,51 @@
-# Mozu PayPal Express using Arc.js
-### version 0.1.0
+#PayPal Express Integration for Mozu (Using Arc.js)
+###version 0.1.0
 
-[PayPal Express](https://developer.paypal.com/docs/classic/products/express-checkout/) integration uses the Arc.js framework to create custom actions to enable the use of the PayPal Express checkout on Mozu platform. Follow the directions below to use the code in this repository to enable PayPal Express checkout on your Mozu site.
+The [PayPal Express](https://developer.paypal.com/docs/classic/products/express-checkout/) Integration for Mozu uses the [Arc.js](http://developer.mozu.com/content/arcjs/Arcjs_Intro.htm) framework to create custom actions that enable merchants to add PayPal’s Express Checkout functionality to sites on the Mozu platform. This readme describes how to use the code in this repository to enable PayPal Express on your Mozu site.
+
+**Note:** The instructions in this readme only apply if you have Arc.js enabled and are integrating this application in-house. Contact your Mozu representative to enable Arc.js on your tenant. If you installed the PayPal Express Certified Code Action from Mozu, you do not need to build this app. You can go directly to the [theme widget](https://github.com/Mozu/PayPalExpress-Theme) to merge PayPal Express with your Mozu theme.
+
 
 ## Requirements
 
-In order to work with Arc.js, you'll need to have:
+Review the following requirements to ensure you have everything you need to successfully build this application: 
 
- - A Developer Account at [mozu.com](http://mozu.com/login)
- - A [Sync App](https://github.com/Mozu/generator-mozu-app/blob/master/docs/sync-app.md) created for your developer login
- - A Sandbox connected to that developer account, with code actions enabled
- - NodeJS v0.12
- - The following global NPM packages installed
+ - A Developer Account at [mozu.com](http://mozu.com/login) with the Arc.js framework enabled.
+ - A [Sync App](https://github.com/Mozu/generator-mozu-app/blob/master/docs/sync-app.md) created for your developer login.
+ - A Sandbox connected to the Developer Account, with code actions enabled.
+ - NodeJS v0.12 or later.
+ - The following global NPM packages installed:
     - `yo`
     - `grunt-cli`
     - `generator-mozu-app`
-   Install all of these at once with the following command:
+   You can install all of these at once from the command prompt with the following command:
    ```sh
    npm i -g yo grunt-cli generator-mozu-app
    ```
 
 ## Setup
 
-1. First, clone this repository to a folder on your development machine:
+1. Clone this repository to a folder on your development machine:
    ```sh
-   $ https://github.com/Mozu/PayPal-Express.git
+   $ git clone https://github.com/Mozu/PayPal-Express.git
    
    Cloning into './PayPal-Express'...
    done.
    ```
 
-2. Login to the Mozu Developer Center and create a new app. Call it "PayPal Express Checkout". Make a note of its Application Key.
+2. Login to the Mozu Developer Center and create a new app. Call it "PayPal Express Checkout" and make a note of its Application Key.
 
-3. Now you're prepared to generate your upload configuration! Have on hand:
-    - The application key for the app you just created
-    - Your Developer Center login
-    - The Application Key and Shared Secret for your sync app
-   Got all those? OK, in your `PayPal-Express` directory you cloned from Git, run:
+3. Now you're prepared to generate your upload configuration. Have on hand:
+    - The application key for the app you just created.
+    - Your Developer Center login credentials.
+    - The Application Key and Shared Secret for your sync app.
+   In the `PayPal-Express` directory you cloned from Git, run:
    ```sh
    $ yo mozu-app --config
    ```
    You will be prompted to enter all the necessary information.
 
-4. Once that is complete, you should be able to run `npm install`:
+4. Once that is complete, run `npm install`:
    ```sh
    $ npm install
    ```
@@ -52,27 +55,28 @@ In order to work with Arc.js, you'll need to have:
    ```sh
    $ grunt
    ```
-   to upload the actions to Developer Center. To upload continuously as you work, by detecting when you change files, run:
+   to upload the actions to Developer Center. You acn also run:
    ```sh
    $ grunt watch
    ```
+   to continuously upload changes as you work. Grunt detects the file changes automatically.
 
-## Installing Arc.js Actions
+## Install and Configure the App
 
-Now that you've uploaded the code to your PayPal Express Checkout app, it's ready to install in your sandbox! In the top right of the app details page for your Achievements app, there is an "Install" button. Click it, and in the ensuing dialog, select your sandbox. Click "Install"!
+Now that you've uploaded the code to your PayPal Express Checkout app, it's ready to install in your sandbox. 
 
+1. Go to the app details page in Developer Center and click the **Install** button. 
+2. In the dialog that appears, select your sandbox and click **Install**.
 *If the install process fails at this point, check with Mozu Support to make sure that the Arc.js framework is enabled for your sandbox.*
+3. View your sandbox.
+4. In Mozu Admin, select **Settings** > **Payment & Checkout**. You should see a new **PayPal Express2** option. Enable the checkbox to configure Mozu with your PayPal account settings. The following settings are required for PayPalExpress2 to work:
+  - UserName
+  - Password
+  - Signature
+  - Merchant account ID
+  - Order Processing
 
-Now, view your sandbox! You'll find that in the "Settings" menu in the upper right, a item called "Payment & Checkout". Choose it.
-
-You should see a new option "PayPalExpress2". Check the checkbox to enable it.
-
-The following settings are required for PayPalExpress2 to work (Additonal settings can be added by modifying src/paltform.applications/embedded.platform.applications.install.js). 
-- UserName
-- Password
-- Signature
-- Merchant account Id
-- Order Processing
+**Note:** You can add additonal settings by modifying `src/paltform.applications/embedded.platform.applications.install.js`.
 
 ## Theme
 
