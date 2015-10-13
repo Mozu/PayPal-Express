@@ -55,7 +55,7 @@ Review the following requirements to ensure you have everything you need to succ
    ```sh
    $ grunt
    ```
-   to upload the actions to Developer Center. You acn also run:
+   to upload the actions to Developer Center. You can also run:
    ```sh
    $ grunt watch
    ```
@@ -78,21 +78,18 @@ Now that you've uploaded the code to your PayPal Express Checkout app, it's read
 
 **Note:** You can add additonal settings by modifying `src/paltform.applications/embedded.platform.applications.install.js`.
 
-## Theme
+## Merge Theme Changes
 
-Merge [Theme](https://github.com/Mozu/PayPalExpress-Theme.git) changes required to enable PayPal Express checkout flow in storefront
+Installing and configuring the PayPal Express Checkout app enables PayPal Express functionality in Mozu Admin. To enable PayPal Express Checkout on your storefront so that customers can use PayPal Express as a payment method, you must also merge theme changes to enable the PayPal workflow. Mozu provides a sample implementation of the required changes in the [PayPalExpress-Theme](https://github.com/Mozu/PayPalExpress-Theme.git) repository.
 
-To enable PayPal Express Checkout on your storefront, you must configure your PayPal Express Checkout account information in the Payment Settings page in Mozu Admin. Once this information has been entered, the PayPal Express Checkout is available, but in order for it to appear on your storefront for your shoppers your theme must be updated.
-
-To update your theme to support PayPal Express Checkout, review and apply the changes made in our sample implementation to your own theme. A comparison between the core theme and a sample implementation of a theme with PayPal Express Checkout enabled can be viewed [here](https://github.com/Mozu/PayPalExpress-Theme.git).
-
+To update your theme to support PayPal Express Checkout, review the changes made in our sample implementation and apply them to your own theme. A comparison between the core theme and a sample implementation of a theme with PayPal Express Checkout enabled can be viewed [here](https://github.com/Mozu/PayPalExpress-Theme.git).
 
 For more information on working with themes, including modifying, uploading, installing, and applying the theme to your site, see the [Theme Development documentation](http://developer.mozu.com/learn/theme-development/quickstart).
 
 
-## Payment code action
+## Payment Code Actions
 
-The following are the actions for which embedded.commerce.payments.action.performPaymentInteraction is invoked
+The following are the actions for which `embedded.commerce.payments.action.performPaymentInteraction` is invoked:
 - CreatePayment
 - AuthorizePayment
 - CapturePayment
@@ -101,7 +98,7 @@ The following are the actions for which embedded.commerce.payments.action.perfor
 - Rollback
 - VoidPayment
 
-After the payment interaction has been processed, one of the following states can be passed back to the system
+After the payment interaction has been processed, one of the following states can be passed back to the system:
 - Authorized
 - Captured
 - Declined
