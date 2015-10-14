@@ -11,7 +11,6 @@ The [PayPal Express](https://developer.paypal.com/docs/classic/products/express-
 Review the following requirements to ensure you have everything you need to successfully build this application: 
 
  - A Developer Account at [mozu.com](http://mozu.com/login) with the Arc.js framework enabled.
- - A [Sync App](https://github.com/Mozu/generator-mozu-app/blob/master/docs/sync-app.md) created for your developer login.
  - A Sandbox connected to the Developer Account, with code actions enabled.
  - NodeJS v0.12 or later.
  - The following global NPM packages installed:
@@ -38,7 +37,6 @@ Review the following requirements to ensure you have everything you need to succ
 3. Now you're prepared to generate your upload configuration. Have on hand:
     - The application key for the app you just created.
     - Your Developer Center login credentials.
-    - The Application Key and Shared Secret for your sync app.
    In the `PayPal-Express` directory you cloned from Git, run:
    ```sh
    $ yo mozu-app --config
