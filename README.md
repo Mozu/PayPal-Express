@@ -26,7 +26,7 @@ Review the following requirements to ensure you have everything you need to succ
 
 1. Clone this repository to a folder on your development machine:
    ```sh
-   $ git clone https://github.com/Mozu/PayPal-Express.git
+   git clone https://github.com/Mozu/PayPal-Express.git
    
    Cloning into './PayPal-Express'...
    done.
@@ -39,27 +39,27 @@ Review the following requirements to ensure you have everything you need to succ
     - Your Developer Center login credentials.
    In the `PayPal-Express` directory you cloned from Git, run:
    ```sh
-   $ yo mozu-app --config
+   yo mozu-app --config
    ```
    You will be prompted to enter all the necessary information.
 
 4. Once that is complete, run `npm install`:
    ```sh
-   $ npm install
+   npm install
    ```
    to download the necessary dependencies.
 
 5. You're ready to sync! Run `grunt`:
    ```sh
-   $ grunt
+   grunt
    ```
    to upload the actions to Developer Center. You can also run:
    ```sh
-   $ grunt watch
+   grunt watch
    ```
    to continuously upload changes as you work. Grunt detects the file changes automatically.
 
-## Install and Configure the App
+## Install the App
 
 Now that you've uploaded the code to your PayPal Express Checkout app, it's ready to install in your sandbox. 
 
@@ -67,7 +67,12 @@ Now that you've uploaded the code to your PayPal Express Checkout app, it's read
 2. In the dialog that appears, select your sandbox and click **Install**.
 *If the install process fails at this point, check with Mozu Support to make sure that the Arc.js framework is enabled for your sandbox.*
 3. View your sandbox.
-4. In Mozu Admin, select **Settings** > **Payment & Checkout**. You should see a new **PayPal Express2** option. Enable the checkbox to configure Mozu with your PayPal account settings. The following settings are required for PayPalExpress2 to work:
+ 
+## Configure the App
+
+**Note:** More detailed configuration instructions are available in the [PayPal Express Configuration Guide](http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm).
+
+In Mozu Admin, select **Settings** > **Payment & Checkout**. You should see a new **PayPal Express2** option. Enable the checkbox to configure Mozu with your PayPal account settings. The following settings are required for PayPalExpress2 to work:
   - UserName
   - Password
   - Signature
@@ -105,3 +110,10 @@ After the payment interaction has been processed, one of the following states ca
 - Credited
 - New
 - RolledBack
+
+##Additional Resources
+* [PayPal Express Theme Integration for Mozu Core](https://github.com/Mozu/PayPalExpress-Theme) (Theme Repo)
+* [PayPal Express Configuration Guide](http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm) (App Documentation)
+* [Mozu Theme Development Quickstart](http://developer.mozu.com/content/learn/themedev/quickstart/create-your-first-theme.htm) (Mozu Documentation)
+* [Intro to Arc.js](http://developer.mozu.com/content/arcjs/Arcjs_Intro.htm) (Mozu Documentation)
+* [Comparing commits across time](https://help.github.com/articles/comparing-commits-across-time/) (GitHub Help) 
