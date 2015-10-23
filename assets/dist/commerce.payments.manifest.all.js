@@ -798,7 +798,7 @@ module.exports = {
 
 			var authorizedInteraction = self.getInteractionByStatus(payment.interactions,paymentConstants.AUTHORIZED);
 			if (!authorizedInteraction) 
-			  resolve( {status: paymentConstants.VOIDED, amount: paymentAction.amount});
+			  return {status: paymentConstants.VOIDED, amount: paymentAction.amount};
 			var client = self.getPaypalClient(config);
 
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.void)
