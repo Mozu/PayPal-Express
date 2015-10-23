@@ -105,7 +105,7 @@ function setShippingMethod(context, order, existingShippingMethodCode) {
 	return helper.createClientFromContext(OrderShipment,context).getAvailableShipmentMethods({orderId: order.id})
 	.then(function(methods){
 
-		if (!methods || methods.length == 0)
+		if (!methods || methods.length === 0)
 			throw new Error("No Shipping methods found for the selected address");
 
 		console.log("shipment methods", methods);

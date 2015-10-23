@@ -56,32 +56,38 @@ Paypal.prototype.setOrderParams = function(order) {
 	if (order.email) {
 		params.EMAIL = order.email;
 	}
-	params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
+
+	if (order.testAmount)
+		params.PAYMENTREQUEST_0_AMT = order.testAmount;
+	else
+		params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
+
 	if (order.orderNumber)
 		params.PAYMENTREQUEST_0_INVNUM = order.orderNumber;
 
 	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
-	if (order.taxAmount)
-		params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
-	if (order.handlingAmount)
-		params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(order.handlingAmount);
-	if (order.shippingAmount)
-		params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
 
-	if (order.shippingDiscount)
-		params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);		
+	if (!order.testAmount) {
+		if (order.taxAmount)
+			params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
+		if (order.handlingAmount)
+			params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(order.handlingAmount);
+		if (order.shippingAmount)
+			params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
 
-	if (order.items) {
-		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(order.items, function(sum, item) {return sum+(item.amount*item.quantity);},0));
-		self.setProducts(order.items);
-		params = _.extend(params, this.getItemsParams());	
+		if (order.shippingDiscount)
+			params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);		
+
+		if (order.items) {
+			params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(order.items, function(sum, item) {return sum+(item.amount*item.quantity);},0));
+			self.setProducts(order.items);
+			params = _.extend(params, this.getItemsParams());	
+		}
 	}
 
 	if (order.maxAmount)
 		params.MAXAMT = order.maxAmount;
 
-	if (order.testAmount)
-		params.AMT = order.testAmount;
 
 	if (order.shippingAddress) {
 		//params.ADDROVERRIDE = 1;

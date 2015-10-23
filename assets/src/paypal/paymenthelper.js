@@ -42,7 +42,7 @@ module.exports = {
 		else {
 			response.transactionId = result.transactionId;
 			response.responseCode = 200;
-			response.responseText = result.ack;
+			response.responseText = result.ack + " - " + result.correlationId;
 		}
 
 		return response;
@@ -122,7 +122,7 @@ module.exports = {
 			console.log(order);
 			var client = self.getPaypalClient(config);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
-				order.amount = context.configuration.paypal.authorization.amount;
+				order.testAmount = context.configuration.paypal.authorization.amount;
 
 			return client.authorizePayment(order).
 				then(function(result) {
