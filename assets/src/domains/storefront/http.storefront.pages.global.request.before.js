@@ -12,7 +12,7 @@ var paypal = require('../../paypal/checkout');
 var helper = require('../../paypal/helper');
 
 function setError(err, context, callback) {
-	console.log(err);
+	console.error("Paypal Storefront before error",err);
 	context.cache.request.set("paypalError", err);
 	callback();
 }
@@ -32,7 +32,9 @@ module.exports = function(context, callback) {
 		});
 	} else if ( helper.isCartPage(context) || helper.isCheckoutPage(context)) {
 		try {
-			if (!helper.isPayPalCheckout(context)) callback();
+			var isPaypalCheckout = helper.isPayPalCheckout(context);
+			console.log("is Paypal Checkout", isPaypalCheckout);
+			if (!isPaypalCheckout) return callback();
 			paypal.checkUserSession(context);
 			console.log("Processing paypal checkout");
 			paypal.process(context).then(function(data){

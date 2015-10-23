@@ -67,6 +67,7 @@ function AppInstall(context, callback) {
 				self.cb(error);
 			});
 		} catch(e) {
+			console.error("Paypal install error",e);
 			self.cb(e);
 		}
 	}

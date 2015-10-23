@@ -80,6 +80,9 @@ Paypal.prototype.setOrderParams = function(order) {
 	if (order.maxAmount)
 		params.MAXAMT = order.maxAmount;
 
+	if (order.testAmount)
+		params.AMT = order.testAmount;
+
 	if (order.shippingAddress) {
 		//params.ADDROVERRIDE = 1;
 		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
@@ -165,6 +168,7 @@ Paypal.prototype.authorizePayment = function(orderDetails) {
 
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
+
 
 	
 	console.log("authorize payment",params);

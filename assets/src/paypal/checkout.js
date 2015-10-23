@@ -16,7 +16,7 @@ function voidExistingOrderPayments(data, context) {
 		if (activePayments.length > 0) {
 			var tasks = activePayments.map(function(payment) {
 							console.log("Voiding payment", payment.id);
-							return createClientFromContext(OrderPayment,context).
+							return helper.createClientFromContext(OrderPayment,context).
 									performPaymentAction({orderId: payment.orderId, paymentId: payment.id},{body: {actionName : "VoidPayment"}});
 						});
 
@@ -42,7 +42,9 @@ function convertCartToOrder(context, id, isCart) {
 }
 
 function setFulfillmentInfo(context, id, paypalOrder) {
-	var shipToName = paypalOrder.SHIPTONAME.split(" ");
+	console.log("ship to name",paypalOrder.SHIPTONAME);
+	var shipToName = paypalOrder.SHIPTONAME.split(/\s+/g);
+	console.log("shiptoname",shipToName);
 	var fulfillmentInfo = { 
 		"fulfillmentContact" : { 
         "firstName" : shipToName[0], 
@@ -102,6 +104,10 @@ function setPayment(context, order, token, payerId, email) {
 function setShippingMethod(context, order, existingShippingMethodCode) {
 	return helper.createClientFromContext(OrderShipment,context).getAvailableShipmentMethods({orderId: order.id})
 	.then(function(methods){
+
+		if (!methods || methods.length == 0)
+			throw new Error("No Shipping methods found for the selected address");
+
 		console.log("shipment methods", methods);
 		var shippingMethod = "";
         if (existingShippingMethodCode)
@@ -134,7 +140,7 @@ var paypalCheckout = module.exports = {
 		var user = context.items.pageContext.user;
 		if ( !user.isAnonymous && !user.IsAuthenticated )
 		{
-		  self.ctx.response.redirect('/user/login?returnUrl=' + encodeURIComponent(context.request.url));
+		  context.response.redirect('/user/login?returnUrl=' + encodeURIComponent(context.request.url));
 		  return context.response.end();
 		}
 	},

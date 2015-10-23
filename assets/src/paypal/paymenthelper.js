@@ -33,6 +33,7 @@ module.exports = {
 		return newStatus;
 	},
 	getPaymentResult: function (result, status, amount) {
+		console.log(result);
 		var response = {status : status,amount: amount};
 		if (status === paymentConstants.FAILED || status === paymentConstants.DECLINED) {
 			response.responseText = result.statusText+" - "+result.correlationId;
@@ -141,7 +142,7 @@ module.exports = {
 						return captureResult;
 					});
 		}).catch(function(err) {
-			console.log(err);
+			console.error("Authorize error",err);
 			return self.getPaymentResult({statusText: err}, paymentConstants.FAILED, paymentAction.amount);
 		});
 	},
@@ -183,24 +184,24 @@ module.exports = {
 		    		return self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount);
 		    	});	
 		}).catch(function(err) {
-			console.log(err);
+			console.error("Capture Error ",err);
 			return self.getPaymentResult({statusText: err}, paymentConstants.DECLINED, paymentAction.amount);
 		});
 
 	},
 	creditPayment: function(context, config, paymentAction, payment) {
 		var self = this;
-		var promise = new Promise(function(resolve, reject) {
+		//var promise = new Promise(function(resolve, reject) {
 	      var capturedInteraction = self.getInteractionByStatus(payment.interactions,paymentConstants.CAPTURED);
 	      console.log("AWS Refund, previous capturedInteraction", capturedInteraction);
 	      if (!capturedInteraction) {
-	        resolve({status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment has not been captured to issue refund"});
+	        return {status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment has not been captured to issue refund"};
 	      } 
 
 	      if (paymentAction.manualGatewayInteraction) {
 	        console.log("Manual credit...dont send to Paypal");
-	        resolve({amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.CREDITED,
-	                transactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId});
+	        return {amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.CREDITED,
+	                transactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId};
 	      }
 	      
 	      var fullRefund = paymentAction.amount === capturedInteraction.amount;
@@ -211,28 +212,28 @@ module.exports = {
 
 	      return client.doRefund(capturedInteraction.gatewayTransactionId, fullRefund, paymentAction.amount, paymentAction.currencyCode).then(
 	       function(refundResult) {
-	       		resolve(self.getPaymentResult(refundResult,paymentConstants.CREDITED, paymentAction.amount));
+	       		return self.getPaymentResult(refundResult,paymentConstants.CREDITED, paymentAction.amount);
 	      }, function(err) {
-	        console.log("Capture Error", err);
-	        resolve(self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount));
+	        console.error("Credit Error", err);
+	        return self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount);
 	      });
-		});
+		//});
 		
-		return promise;
+		//return promise;
 	},
 	voidPayment: function(context,config, paymentAction, payment) {
 		var self = this;
-		var promise = new Promise(function(resolve, reject) {
+		//var promise = new Promise(function(resolve, reject) {
 			if (paymentAction.manualGatewayInteraction) {
 			      console.log("Manual void...dont send to amazon");
-			      resolve({amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.VOIDED,
-			              awsTransactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId});
+			      return {amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.VOIDED,
+			              awsTransactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId};
 			}
 
 			var capturedInteraction = self.getInteractionByStatus(payment.interactions,paymentConstants.CAPTURED);
 			console.log("Void Payment - Captured interaction", capturedInteraction);
 			if (capturedInteraction) {
-			  resolve({status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment with captures cannot be voided. Please issue a refund"});
+			  return {status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment with captures cannot be voided. Please issue a refund"};
 			} 
 
 			var authorizedInteraction = self.getInteractionByStatus(payment.interactions,paymentConstants.AUTHORIZED);
@@ -245,14 +246,15 @@ module.exports = {
 
 			return client.doVoid(authorizedInteraction.gatewayTransactionId).then(
 				function(result) {
-					resolve(self.getPaymentResult(result,paymentConstants.VOIDED, paymentAction.amount ));
+					return self.getPaymentResult(result,paymentConstants.VOIDED, paymentAction.amount );
 				},
 				function(err) {
-					resolve(self.getPaymentResult(result,paymentConstants.FAILED, paymentAction.amount ));	
+					console.error("Void Payment", err);
+					return self.getPaymentResult(result,paymentConstants.FAILED, paymentAction.amount );	
 				}
 			);
 
-		});
-		return promise;
+		//});
+		//return promise;
 	}
 };
