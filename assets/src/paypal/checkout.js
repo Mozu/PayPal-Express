@@ -21,10 +21,13 @@ function voidExistingOrderPayments(data, context) {
 						});
 
 			Promise.all(tasks).then(function(result) {
-				return resolve(data);
+				return helper.getOrder(context, data.order.id).then(function(order){
+					data.order = order;
+					resolve(data);
+				});
 			},reject);
 		} else
-			return resolve(data);
+			 resolve(data);
 	});
 
 	return promise;
@@ -218,15 +221,24 @@ var paypalCheckout = module.exports = {
 			return convertCartToOrder(context, id, isCart).then(
 				function(order){
 					var existingShippingMethodCode = order.fulfillmentInfo.shippingMethodCode;
+					var shipItems = _.filter(order.items,function(item) {return item.fulfillmentMethod === "Ship";});
+					var requiresFulfillmentInfo = false;
+					console.log("ship Items", shipItems);
+					if (shipItems && shipItems.length > 0)
+						requiresFulfillmentInfo = true;
+					console.log("requiresFulfillmentInfo", requiresFulfillmentInfo);
+
 					return {
 						config: config, 
 						order: order, 
+						requiresFulfillmentInfo: requiresFulfillmentInfo,
 						existingShippingMethodCode : order.fulfillmentInfo.shippingMethodCode
 					};
 				}
 			);
 		}).then(function(response) {
 			//get Paypal order details
+			console.log("order", response.order);
 			var client = paymentHelper.getPaypalClient(response.config);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
@@ -239,6 +251,8 @@ var paypalCheckout = module.exports = {
 			});
 		}).then(function(response){
 			//set Shipping address
+			if (!response.requiresFulfillmentInfo) return response;
+			console.log(response.order);
 			return setFulfillmentInfo(context, response.order.id, response.paypalOrder).
 			then(function(fulfillmentInfo) {
 				response.order.fulfillmentInfo = fulfillmentInfo;
@@ -246,6 +260,7 @@ var paypalCheckout = module.exports = {
 			});
 		}).then(function(response){
 			//set shipping method
+			if (!response.requiresFulfillmentInfo) return response;
 			return setShippingMethod(context, response.order, response.existingShippingMethodCode).
 			then(function(order){
 				response.order = order;
