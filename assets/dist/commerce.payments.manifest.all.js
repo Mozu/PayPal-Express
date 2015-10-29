@@ -895,15 +895,12 @@ Paypal.prototype.setOrderParams = function(order) {
 
 	if (order.testAmount)
 		params.PAYMENTREQUEST_0_AMT = order.testAmount;
-	else
+	else {
 		params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
-
-	if (order.orderNumber)
+			if (order.orderNumber)
 		params.PAYMENTREQUEST_0_INVNUM = order.orderNumber;
 
-	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
-
-	if (!order.testAmount) {
+		params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
 		if (order.taxAmount)
 			params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
 		if (order.handlingAmount)
@@ -926,7 +923,7 @@ Paypal.prototype.setOrderParams = function(order) {
 
 
 	if (order.shippingAddress) {
-		//params.ADDROVERRIDE = 1;
+		params.ADDROVERRIDE = 1;
 		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
 		params.PAYMENTREQUEST_0_SHIPTOSTREET = order.shippingAddress.address1;
 		if (order.shippingAddress.address2) 
