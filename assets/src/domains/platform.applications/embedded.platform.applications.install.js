@@ -5,9 +5,10 @@
  */
 
 var ActionInstaller = require('mozu-action-helpers/installers/actions');
-var tenantClient = require("mozu-node-sdk/clients/platform/tenant")();
+//var tenantClient = require("mozu-node-sdk/clients/platform/tenant")();
 var constants = require("mozu-node-sdk/constants");
 var paymentConstants = require("../../paypal/constants");
+var helper = require("../../paypal/helper");
 var _ = require("underscore");
 
 
@@ -19,46 +20,25 @@ function AppInstall(context, callback) {
 	self.initialize = function() {
 		console.log(context);
 		console.log("Getting tenant", self.ctx.apiContext.tenantId);
-		tenantClient.getTenant({tenantId: self.ctx.apiContext.tenantId})
-		.then(function(tenant){
-			enablePaypalExpressWorkflow(tenant);
-		}, self.cb);
+		var tenant = context.get.tenant();
+		enablePaypalExpressWorkflow(tenant);
+		//tenantClient.getTenant({tenantId: self.ctx.apiContext.tenantId})
+		//.then(function(tenant){
+		//	enablePaypalExpressWorkflow(tenant);
+		//}, self.cb);
 	};
 
 	function enablePaypalExpressWorkflow(tenant) {
 
 		try {
 			console.log("Installing PayPal Express payment settings", tenant);
-			var paymentDef = {
-		    "name": paymentConstants.PAYMENTSETTINGID,
-		    "namespace": context.get.nameSpace(),
-		    "isEnabled": "false",
-		    "credentials":  [
-			    	getPaymentActionFieldDef("Environment", paymentConstants.ENVIRONMENT, "RadioButton", false,getEnvironmentVocabularyValues()),
-			    	getPaymentActionFieldDef("User Name", paymentConstants.USERNAME, "TextBox", true,null),
-			    	getPaymentActionFieldDef("Password", paymentConstants.PASSWORD, "TextBox", true,null),
-			    	getPaymentActionFieldDef("Signature", paymentConstants.SIGNATURE, "TextBox", true,null),
-			    	getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "TextBox", false,null),
-			    	getPaymentActionFieldDef("Order Processing", paymentConstants.ORDERPROCESSING, "RadioButton", false,getOrderProcessingVocabularyValues())
-			    ]
-			};
+			
 
-			console.log("PayPal Express Payment definition", paymentDef);
-
-			var tasks = tenant.sites.map(function(site) {
-											console.log("Adding payment settings for site", site.id);
-											var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
-											paymentSettingsClient.context[constants.headers.SITE] = site.id;
-											//GetExisting 
-											return paymentSettingsClient.getThirdPartyPaymentWorkflows({}).then(function(paymentSettings){
-												var existing = _.findWhere(paymentSettings, {"name" : paymentDef.name});
-												
-												if (!existing) 
-													return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
-												else
-													console.log("PayPal Express payment Def exists for "+site.id);
-											});
-										});
+			var tasks = tenant.sites.map(
+							function(site) {
+								return addUpdatePaymentSettings(context, site);
+							}
+						);
 
 			Promise.all(tasks).then(function(result) {
 				console.log("PayPal Express payment definition installed");
@@ -73,15 +53,67 @@ function AppInstall(context, callback) {
 	}
 
 
+	
 
+	function addUpdatePaymentSettings(context, site) {
+		console.log("Adding payment settings for site", site.id);
+		var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
+		paymentSettingsClient.context[constants.headers.SITE] = site.id;
+		//GetExisting 
+		var paymentDef = getPaymentDef();
+		return paymentSettingsClient.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName :  paymentDef.namespace+"~"+paymentDef.name })
+		.then(function(paymentSettings){
+			return updateThirdPartyPaymentWorkflow(paymentSettingsClient, paymentSettings);
+		},function(err) {
+			return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
+		});
+	}
+
+	function updateThirdPartyPaymentWorkflow(paymentSettingsClient, existingSettings) {
+		var paymentDef = getPaymentDef(existingSettings);
+		console.log(paymentDef);
+		paymentDef.isEnabled = existingSettings.isEnabled;
+		return paymentSettingsClient.deleteThirdPartyPaymentWorkflow({ "fullyQualifiedName" : paymentDef.namespace+"~"+paymentDef.name})
+		.then(function(result) {
+			return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
+		});
+	}
 
 	function enableActions() {
 		console.log("installing code actions");
 		var installer = new ActionInstaller({ context: self.ctx.apiContext });
-	 	installer.enableActions(context).then(self.cb.bind(null, null), self.cb);	
+	 	installer.enableActions(self.ctx, null, {
+			"http.storefront.pages.global.request.before" : function(settings) {
+				settings = settings || {};
+				settings.timeoutMilliseconds = 15000;
+				return settings;
+			},
+			"embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
+				settings = settings || {};
+				settings.timeoutMilliseconds = 15000;
+				return settings;
+			}
+
+		}).then(self.cb.bind(null,null), self.cb);	
 	}
 
 
+	function getPaymentDef(existingSettings) {
+		return {
+		    "name": paymentConstants.PAYMENTSETTINGID,
+		    "namespace": context.get.nameSpace(),
+		    "isEnabled": "false",
+		    "description" : "<div style='font-size:13px;font-style:italic'>Please review our <a style='color:blue;' target='mozupaypalhelp' href='http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm'>Help</a> documentation to configure Paypal Express</div>",
+		    "credentials":  [
+			    	getPaymentActionFieldDef("Environment", paymentConstants.ENVIRONMENT, "RadioButton", false,getEnvironmentVocabularyValues(), existingSettings),
+			    	getPaymentActionFieldDef("User Name", paymentConstants.USERNAME, "TextBox", true,null,existingSettings),
+			    	getPaymentActionFieldDef("Password", paymentConstants.PASSWORD, "TextBox", true,null,existingSettings),
+			    	getPaymentActionFieldDef("Signature", paymentConstants.SIGNATURE, "TextBox", true,null,existingSettings),
+			    	getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "TextBox", false,null,existingSettings),
+			    	getPaymentActionFieldDef("Order Processing", paymentConstants.ORDERPROCESSING, "RadioButton", false,getOrderProcessingVocabularyValues(),existingSettings)
+			    ]
+			};
+	}
 	
 	function getEnvironmentVocabularyValues() {
 		return [
@@ -107,13 +139,18 @@ function AppInstall(context, callback) {
 		};
 	}
 
-	function getPaymentActionFieldDef(displayName, key, type, isSensitive, vocabularyValues) {
+	function getPaymentActionFieldDef(displayName, key, type, isSensitive, vocabularyValues, existingSettings) {
+		value = "";
+		if (existingSettings)
+			value = helper.getValue(existingSettings, key);
+
 		return {
 	          "displayName": displayName,
 	          "apiName": key,
 	          "inputType": type,
 	          "isSensitive": isSensitive,
-	          "vocabularyValues" : vocabularyValues
+	          "vocabularyValues" : vocabularyValues,
+	          "value" : value
 		};
 	}
 

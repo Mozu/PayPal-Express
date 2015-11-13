@@ -25,7 +25,7 @@ module.exports = function(context, callback) {
 		}
 		else if (paypalError.errorMessage)
 			message = paypalError.errorMessage;
-		context.response.viewData.model.messages = 	[	
+		context.response.model.messages = 	[	
 			{"message": message}
 		];
 		//context.response.viewData.paypalError = paypalError;

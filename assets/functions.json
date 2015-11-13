@@ -6,6 +6,11 @@
       "actionId": "embedded.commerce.payments.action.performPaymentInteraction"
     },
     {
+      "id": "http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before",
+      "virtualPath": "./dist\\commerce.settings.manifest.all.js",
+      "actionId": "http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before"
+    },
+    {
       "id": "embedded.platform.applications.install",
       "virtualPath": "./dist\\platform.applications.manifest.all.js",
       "actionId": "embedded.platform.applications.install"

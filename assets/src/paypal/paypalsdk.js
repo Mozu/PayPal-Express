@@ -49,6 +49,12 @@ function prepareNumber(num, doubleZero) {
 	return str;
 }
 
+Paypal.prototype.getMerchantId = function() {
+	var self = this;
+	var params = self.params();
+	params.METHOD = "GetPalDetails";
+	return self.request(params);
+};
 
 Paypal.prototype.setOrderParams = function(order) {
 	var self = this;
@@ -87,7 +93,7 @@ Paypal.prototype.setOrderParams = function(order) {
 
 
 	if (order.shippingAddress) {
-		params.ADDROVERRIDE = 1;
+		//params.ADDROVERRIDE = 1;
 		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
 		params.PAYMENTREQUEST_0_SHIPTOSTREET = order.shippingAddress.address1;
 		if (order.shippingAddress.address2) 
@@ -168,7 +174,7 @@ Paypal.prototype.authorizePayment = function(orderDetails) {
 	
 	params.PAYERID = orderDetails.payerId;
 	params.TOKEN = orderDetails.token;
-
+	params.BUTTONSOURCE = "Volusion_Cart_Mozu_EC";
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
 
@@ -304,7 +310,6 @@ Paypal.prototype.request = function( params) {
 	var self = this;
 	var promise = new Promise(function(resolve, reject) {
 		var encodedParams = querystring.stringify(params);
-
 		needle.post(self.url, 
 			encodedParams,
 			{json: false, parse: true}, 

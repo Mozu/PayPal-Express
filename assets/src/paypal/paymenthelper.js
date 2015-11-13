@@ -12,21 +12,54 @@ module.exports = {
 	  } );
 	},
 	getPaymentConfig: function(context) {
+		var self = this;
 		return helper.createClientFromContext(PaymentSettings, context,true)
 			.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName: helper.getPaymentFQN(context)})
 			.then(function(paypalSettings) {
-				return {
+				return self.getConfig(paypalSettings);
+		});
+	},
+	getConfig: function(paypalSettings) {
+		return {
 					userName: helper.getValue(paypalSettings, paymentConstants.USERNAME),
 					password: helper.getValue(paypalSettings, paymentConstants.PASSWORD),
 					signature: helper.getValue(paypalSettings, paymentConstants.SIGNATURE),
 					environment : helper.getValue(paypalSettings, paymentConstants.ENVIRONMENT) || "sandbox",
+					merchantId : helper.getValue(paypalSettings, paymentConstants.MERCHANTACCOUNTID),
 					processingOption : helper.getValue(paypalSettings, paymentConstants.ORDERPROCESSING) || paymentConstants.CAPTUREONSHIPMENT,
 					enabled: paypalSettings.isEnabled
 				};
-		});
 	},
+	
 	getPaypalClient: function (config) {
 		return new Paypal.create(config.userName, config.password, config.signature, config.environment === "sandbox");
+	},
+	validatePaymentSettings: function(context, callback) {
+		var self = this;
+		var paymentSettings = context.request.body;
+		var paypalSettings = _.findWhere(paymentSettings.ExternalPaymentWorkflowDefinitions, {FullyQualifiedName : helper.getPaymentFQN(context)});
+  		if (!paypalSettings || !paypalSettings.IsEnabled) callback();
+
+  		var config = self.getConfig(paypalSettings);
+
+  		if (!config.userName || !config.password || !config.signature || !config.merchantId || !config.environment)
+		{
+			callback("Paypal Express - Environment/User Name/Password/Signatue/MerchantId fields are required.");
+			return;
+		}
+
+  		var client = self.getPaypalClient(config);
+
+  		client.getMerchantId().then(function(result){
+  			console.log(result);
+  			if (result.PAL !== config.merchantId)
+  				callback("Paypal Express - MerchantId does not match with value on record.");
+  			else
+	  			callback();	
+  		}, function(e){
+  			console.error(e);
+  			callback("Paypal Express - User Name/Password/Signatue is invalid");
+  		});
 	},
 	createNewPayment: function (context, paymentAction) {
 		var newStatus = { status : paymentConstants.NEW, amount: paymentAction.amount};

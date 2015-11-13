@@ -34,6 +34,8 @@ var helper = module.exports = {
 		var urlParseResult = url.parse(context.request.url);
 		queryStringParams = qs.parse(urlParseResult.query);
 		return queryStringParams;
+		/*console.log(context.request.params);
+		return context.request.params;*/
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
@@ -46,14 +48,14 @@ var helper = module.exports = {
 		return appInfo.namespace+"~"+paymentConstants.PAYMENTSETTINGID;
 	},
 	getValue: function(paymentSetting,  key) {
-		var value = _.findWhere(paymentSetting.credentials, {"apiName" : key});
+		var value = _.findWhere(paymentSetting.credentials, {"apiName" : key}) || _.findWhere(paymentSetting.Credentials, {"APIName" : key}) ;
 
 	    if (!value) {
 	      console.log(key+" not found");
 	      return;
 	    }
 	    //console.log("Key: "+key, value.value );
-	    return value.value;
+	    return value.value || value.Value;
 	},
 	getParamsToPreserve: function(params) {
 		delete params.id;
