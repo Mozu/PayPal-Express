@@ -83,9 +83,11 @@ In Mozu Admin, select **Settings** > **Payment & Checkout**. You should see a ne
 
 ## Merge Theme Changes
 
-Installing and configuring the PayPal Express Checkout app enables PayPal Express functionality in Mozu Admin. To enable PayPal Express Checkout on your storefront so that customers can use PayPal Express as a payment method, you must also merge theme changes to enable the PayPal workflow. Mozu provides a sample implementation of the required changes in the [PayPalExpress-Theme](https://github.com/Mozu/PayPalExpress-Theme.git) repository.
+Installing and configuring the PayPal Express Checkout app enables PayPal Express functionality in Mozu Admin. To enable PayPal Express Checkout on your storefront so that customers can use PayPal Express as a payment method, you must also merge theme changes to enable the PayPal workflow. 
 
-To update your theme to support PayPal Express Checkout, review the changes made in our sample implementation and apply them to your own theme. A comparison between the core theme and a sample implementation of a theme with PayPal Express Checkout enabled can be viewed [here](https://github.com/Mozu/core-theme/compare/).
+Mozu provides sample implementations of the required changes in the [PayPalExpress-Theme](https://github.com/Mozu/PayPalExpress-Theme.git) repository. The theme repository includes multiple branches for different versions of the Mozu Core Theme.
+
+To update your theme to support PayPal Express Checkout, review the changes made in our sample implementation and apply them to your own theme. 
 
 For more information on working with themes, including modifying, uploading, installing, and applying the theme to your site, see the [Theme Development documentation](http://developer.mozu.com/learn/theme-development/quickstart).
 
