@@ -89,7 +89,7 @@ Mozu provides sample implementations of the required changes in the [PayPalExpre
 
 To update your theme to support PayPal Express Checkout, review the changes made in our sample implementation and apply them to your own theme. 
 
-For more information on working with themes, including modifying, uploading, installing, and applying the theme to your site, see the [Theme Development documentation](http://developer.mozu.com/learn/theme-development/quickstart).
+For more information on working with themes, including modifying, uploading, installing, and applying the theme to your site, see the [Theme Development documentation](http://developer.mozu.com/content/learn/themedev/theme-development.htm).
 
 
 ## Payment Code Actions
