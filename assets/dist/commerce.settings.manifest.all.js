@@ -34,14 +34,8 @@ module.exports = {
 var helper = require('../../paypal/paymenthelper');
 
 module.exports = function(context, callback) {
-  //console.log("Commerce settings before",context.request.body);
-  //var paypalSettings = _.findWhere(paymentSettings.ExternalPaymentWorkflowDefinitions, {FullyQualifiedName : helper.getPaymentFQN(context)});
-  //if (!paypalSettings.IsEnabled) callback();
-
   helper.validatePaymentSettings(context, callback);
 
-
-  //callback();
 };
 },{"../../paypal/paymenthelper":5}],3:[function(require,module,exports){
 module.exports = {
