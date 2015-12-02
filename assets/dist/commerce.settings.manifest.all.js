@@ -197,7 +197,7 @@ var helper = module.exports = {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal,
-			handlingAmount: order.handlingTotal,
+			handlingAmount: order.handlingTotal+order.dutyTotal,
 			shippingAmount: order.shippingTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
