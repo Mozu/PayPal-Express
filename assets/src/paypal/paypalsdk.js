@@ -12,7 +12,7 @@ function Paypal(apiUsername, apiPassword, signature, sandbox) {
 	this.payOptions = {};
 	this.products = [];
 
-	this.url = 'https://' + (sandbox ? 'api-3t.sandbox.paypal.com' : 'api-3t.paypal.com') + '/nvp';
+	this.url = 'https://' + (sandbox ? 'old-api-3t.sandbox.paypal.com' : 'api-3t.paypal.com') + '/nvp';
 	this.redirect = 'https://' + (sandbox ? 'www.sandbox.paypal.com/cgi-bin/webscr' : 'www.paypal.com/cgi-bin/webscr');
 }
 
