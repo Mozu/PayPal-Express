@@ -12,12 +12,14 @@
 var Simulator = require('mozu-action-simulator');
 var assert = Simulator.assert;
 
-describe('embedded.platform.applications.install', function () {
+var actionName = 'embedded.platform.applications.install';
+
+describe('paypalInstall implementing embedded.platform.applications.install', function () {
 
   var action;
 
   before(function () {
-    action = require('../src/domains/platform.applications/embedded.platform.applications.install');
+    action = require('../src/domains/platform.applications/paypalInstall');
   });
 
   it('runs successfully', function(done) {
@@ -28,11 +30,11 @@ describe('embedded.platform.applications.install', function () {
       done();
     };
 
-    var context = Simulator.context('embedded.platform.applications.install', callback);
+    var context = Simulator.context(actionName, callback);
 
     // modify context as necessary
 
 
-    Simulator.simulate('embedded.platform.applications.install', action, context, callback);
+    Simulator.simulate(actionName, action, context, callback);
   });
 });

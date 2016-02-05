@@ -1,6 +1,6 @@
 /**
  * This is a scaffold for unit tests for the custom function for
- * `http.storefront.pages.global.request.after`.
+ * `http.storefront.pages.checkout.request.after`.
  * Modify the test conditions below. You may:
  *  - add special assertions for code actions from Simulator.assert
  *  - create a mock context with Simulator.context() and modify it
@@ -13,12 +13,14 @@
 var Simulator = require('mozu-action-simulator');
 var assert = Simulator.assert;
 
-describe('http.storefront.pages.global.request.after', function () {
+var actionName = 'http.storefront.pages.checkout.request.after';
+
+describe('paypalCheckoutAfter implementing http.storefront.pages.checkout.request.after', function () {
 
   var action;
 
   before(function () {
-    action = require('../src/domains/storefront/http.storefront.pages.global.request.after');
+    action = require('../src/domains/storefront/paypalCheckoutAfter');
   });
 
   it('runs successfully', function(done) {
@@ -29,7 +31,7 @@ describe('http.storefront.pages.global.request.after', function () {
       done();
     };
 
-    var context = Simulator.context('http.storefront.pages.global.request.after', callback);
+    var context = Simulator.context(actionName, callback);
 
     // modify context as necessary
 
@@ -42,7 +44,7 @@ describe('http.storefront.pages.global.request.after', function () {
      var server = http.createServer(function(req, res) {
       context.request = req;
       context.response = res;
-      assert.ok(Simulator.simulate('http.storefront.pages.global.request.after', action, context, callback));
+      assert.ok(Simulator.simulate(actionName, action, context, callback));
      }).listen(9000);
      http.get('http://localhost:9000/', function(req, res) {
       // add the request body here
@@ -50,6 +52,6 @@ describe('http.storefront.pages.global.request.after', function () {
 
     */
 
-    Simulator.simulate('http.storefront.pages.global.request.after', action, context, callback);
+    Simulator.simulate(actionName, action, context, callback);
   });
 });

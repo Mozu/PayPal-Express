@@ -1,13 +1,14 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.index = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 module.exports = {
   
-  'http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before': {
+  'paypalValidator': {
       actionName: 'http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before',
-      customFunction: require('./domains/commerce.settings/http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before')
+      customFunction: require('./domains/commerce.settings/paypalValidator')
   }
+
 };
 
-},{"./domains/commerce.settings/http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before":2}],2:[function(require,module,exports){
+},{"./domains/commerce.settings/paypalValidator":2}],2:[function(require,module,exports){
 /**
  * Implementation for http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before
 
@@ -94,14 +95,11 @@ var helper = module.exports = {
 		var urlParseResult = url.parse(context.request.url);
 		queryStringParams = qs.parse(urlParseResult.query);
 		return queryStringParams;
-		/*console.log(context.request.params);
-		return context.request.params;*/
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
-		return (queryString.paypalCheckout === "1" && 
-			queryString.PayerID !== "" && 
-			queryString.token !== "" && (queryString.id !== "" || this.isCheckoutPage(context)) );
+		return (queryString.PayerID !== "" && 
+			queryString.token !== "" && queryString.id !== ""  );
 	},
 	getPaymentFQN: function(context) {
 		var appInfo = getAppInfo(context);

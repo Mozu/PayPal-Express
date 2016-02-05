@@ -138,6 +138,8 @@ function getUserEmail(context) {
 	return null;
 }
 
+
+
 var paypalCheckout = module.exports = {
 	checkUserSession: function(context) {
 		var user = context.items.pageContext.user;
@@ -147,7 +149,7 @@ var paypalCheckout = module.exports = {
 		  return context.response.end();
 		}
 	},
-	getToken: function(context) {
+	getToken: function(context, callback) {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
@@ -155,7 +157,8 @@ var paypalCheckout = module.exports = {
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
 		var domain = "https://"+referrer.host;
-		var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
+		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
+		var redirectUrl = domain+"/paypal/checkout?id="+id+"&isCart="+(isCart ? 1 : 0);
 		var cancelUrl = domain + (isCart ? "/cart" : "/checkout/"+id);
 
 
@@ -192,21 +195,16 @@ var paypalCheckout = module.exports = {
 		});
 
 	},
-	process: function(context) {
+	process: function(context, queryString, isCart) {
 		var self = this;
 
-		var queryString = helper.parseUrl(context);
+		//var queryString = helper.parseUrl(context);
 		
 		var id = queryString.id;
 		var token = queryString.token;
 		var payerId = queryString.PayerID;
-
-		var isCart = helper.isCartPage(context);
-		if (!isCart) {
-			var url = helper.parseHref(context);
-			console.log(url.pathname.split("/"));
-			id = url.pathname.split("/")[2];
-		}
+		//var isCart = queryString.isCart == "1";
+		
 		console.log("PayerId", payerId);
 		console.log("Token", token);
 		console.log("Id", id);
@@ -238,14 +236,12 @@ var paypalCheckout = module.exports = {
 			);
 		}).then(function(response) {
 			//get Paypal order details
-			console.log("order", response.order);
 			var client = paymentHelper.getPaypalClient(response.config);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
 			
 			return client.getExpressCheckoutDetails(token).
 			then(function(paypalOrder) {
-				console.log("Paypal order", paypalOrder);
 				response.paypalOrder = paypalOrder;
 				return response;
 			});
@@ -318,5 +314,29 @@ var paypalCheckout = module.exports = {
 			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction);
 			callback();
 		}, callback);
+	},
+	addErrorToViewData : function(context, callback) {
+		cache  = context.cache.getOrCreate({type:'distributed', scope:'tenant', level:'shared'});
+		var queryString = helper.parseUrl(context);
+
+		if (queryString.ppErrorId){
+			var paypalError = cache.get("PPE-"+queryString.ppErrorId);
+			if (paypalError) {
+				console.log("Adding paypal error to viewData", paypalError);
+				var message = paypalError;
+				if (paypalError.statusText)
+					message = paypalError.statusText;
+				else if (paypalError.message){
+					message = paypalError.message;
+					if (message.errorMessage)
+						message = message.errorMessage;
+				}
+				else if (paypalError.errorMessage)
+					message = paypalError.errorMessage;
+				
+				context.response.viewData.paypalError = paypalError;
+			}
+		}
+		callback();
 	}
 };

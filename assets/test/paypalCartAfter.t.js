@@ -1,6 +1,6 @@
 /**
  * This is a scaffold for unit tests for the custom function for
- * `http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before`.
+ * `http.storefront.pages.cart.request.after`.
  * Modify the test conditions below. You may:
  *  - add special assertions for code actions from Simulator.assert
  *  - create a mock context with Simulator.context() and modify it
@@ -13,14 +13,14 @@
 var Simulator = require('mozu-action-simulator');
 var assert = Simulator.assert;
 
-var actionName = 'http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before';
+var actionName = 'http.storefront.pages.cart.request.after';
 
-describe(actionName, function () {
+describe('paypalCartAfter implementing http.storefront.pages.cart.request.after', function () {
 
   var action;
 
   before(function () {
-    action = require('../src/domains/commerce.settings/http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before');
+    action = require('../src/domains/storefront/paypalCartAfter');
   });
 
   it('runs successfully', function(done) {

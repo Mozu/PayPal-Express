@@ -6,24 +6,34 @@
       "actionId": "embedded.commerce.payments.action.performPaymentInteraction"
     },
     {
-      "id": "http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before",
+      "id": "paypalValidator",
       "virtualPath": "./dist\\commerce.settings.manifest.all.js",
       "actionId": "http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before"
     },
     {
-      "id": "embedded.platform.applications.install",
+      "id": "paypalInstall",
       "virtualPath": "./dist\\platform.applications.manifest.all.js",
       "actionId": "embedded.platform.applications.install"
     },
     {
-      "id": "http.storefront.pages.global.request.before",
+      "id": "paypalCartAfter",
       "virtualPath": "./dist\\storefront.manifest.all.js",
-      "actionId": "http.storefront.pages.global.request.before"
+      "actionId": "http.storefront.pages.cart.request.after"
     },
     {
-      "id": "http.storefront.pages.global.request.after",
+      "id": "paypalCheckoutAfter",
       "virtualPath": "./dist\\storefront.manifest.all.js",
-      "actionId": "http.storefront.pages.global.request.after"
+      "actionId": "http.storefront.pages.checkout.request.after"
+    },
+    {
+      "id": "paypalProcessor",
+      "virtualPath": "./dist\\storefront.manifest.all.js",
+      "actionId": "http.storefront.routes"
+    },
+    {
+      "id": "paypalToken",
+      "virtualPath": "./dist\\storefront.manifest.all.js",
+      "actionId": "http.storefront.routes"
     }
   ]
 }

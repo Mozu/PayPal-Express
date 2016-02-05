@@ -1,12 +1,20 @@
 module.exports = {
   
-  'http.storefront.pages.global.request.before': {
-      actionName: 'http.storefront.pages.global.request.before',
-      customFunction: require('./domains/storefront/http.storefront.pages.global.request.before')
+  'paypalCartAfter': {
+      actionName: 'http.storefront.pages.cart.request.after',
+      customFunction: require('./domains/storefront/paypalCartAfter')
+  },
+  'paypalCheckoutAfter': {
+      actionName: 'http.storefront.pages.checkout.request.after',
+      customFunction: require('./domains/storefront/paypalCheckoutAfter')
   },
   
-  'http.storefront.pages.global.request.after': {
-      actionName: 'http.storefront.pages.global.request.after',
-      customFunction: require('./domains/storefront/http.storefront.pages.global.request.after')
+  'paypalProcessor': {
+      actionName: 'http.storefront.routes',
+      customFunction: require('./domains/storefront/paypalProcessor')
+  },
+  'paypalToken': {
+      actionName: 'http.storefront.routes',
+      customFunction: require('./domains/storefront/paypalToken')
   }
 };

@@ -1,6 +1,6 @@
 {
   "name": "PayPal-Express",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "PayPal Express Integration",
   "repository": {
     "type": "git",
@@ -20,6 +20,8 @@
     "time-grunt": "^1.2.1"
   },
   "dependencies": {
+    "easy-guid": "^0.1.3",
+    "guid": "0.0.12",
     "mozu-node-sdk": "^1.18.15223-5",
     "needle": "^0.10.0",
     "underscore": "^1.8.3",

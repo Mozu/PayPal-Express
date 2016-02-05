@@ -34,14 +34,11 @@ var helper = module.exports = {
 		var urlParseResult = url.parse(context.request.url);
 		queryStringParams = qs.parse(urlParseResult.query);
 		return queryStringParams;
-		/*console.log(context.request.params);
-		return context.request.params;*/
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
-		return (queryString.paypalCheckout === "1" && 
-			queryString.PayerID !== "" && 
-			queryString.token !== "" && (queryString.id !== "" || this.isCheckoutPage(context)) );
+		return (queryString.PayerID !== "" && 
+			queryString.token !== "" && queryString.id !== ""  );
 	},
 	getPaymentFQN: function(context) {
 		var appInfo = getAppInfo(context);

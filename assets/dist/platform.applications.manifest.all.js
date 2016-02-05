@@ -14,159 +14,210 @@ var _ = require("underscore");
 
 
 function AppInstall(context, callback) {
-	var self = this;
-	self.ctx = context;
-	self.cb = callback;
+  var self = this;
+  self.ctx = context;
+  self.cb = callback;
 
-	self.initialize = function() {
-		console.log(context);
-		console.log("Getting tenant", self.ctx.apiContext.tenantId);
-		var tenant = context.get.tenant();
-		enablePaypalExpressWorkflow(tenant);
-		//tenantClient.getTenant({tenantId: self.ctx.apiContext.tenantId})
-		//.then(function(tenant){
-		//	enablePaypalExpressWorkflow(tenant);
-		//}, self.cb);
-	};
+  self.initialize = function() {
+    console.log(context);
+    console.log("Getting tenant", self.ctx.apiContext.tenantId);
+    var tenant = context.get.tenant();
+    enablePaypalExpressWorkflow(tenant);
+  };
 
-	function enablePaypalExpressWorkflow(tenant) {
+  function enablePaypalExpressWorkflow(tenant) {
 
-		try {
-			console.log("Installing PayPal Express payment settings", tenant);
-			
+    try {
+      console.log("Installing PayPal Express payment settings", tenant);
+      
 
-			var tasks = tenant.sites.map(
-							function(site) {
-								return addUpdatePaymentSettings(context, site);
-							}
-						);
+      var tasks = tenant.sites.map(
+              function(site) {
+                return addUpdatePaymentSettings(context, site);
+              }
+            );
 
-			Promise.all(tasks).then(function(result) {
-				console.log("PayPal Express payment definition installed");
-				enableActions();
-			}, function(error) {
-				self.cb(error);
-			});
-		} catch(e) {
-			console.error("Paypal install error",e);
-			self.cb(e);
-		}
-	}
+      Promise.all(tasks).then(function(result) {
+        console.log("PayPal Express payment definition installed");
+        addCustomRoutes(context, tenant);
+      }, function(error) {
+        self.cb(error);
+      });
+
+      
+    } catch(e) {
+      console.error("Paypal install error",e);
+      self.cb(e);
+    }
+  }
 
 
-	
+  function addCustomRoutes(context, tenant) {
+    var tasks = tenant.sites.map(
+      function(site) {
+        var customRoutesApi = require("mozu-node-sdk/clients/commerce/settings/general/customRouteSettings")();
+        customRoutesApi.context[constants.headers.SITE] = site.id;
+        return customRoutesApi.getCustomRouteSettings().then(
+          function(customRoutes) {
+            return appUpdateCustomRoutes(customRoutesApi, customRoutes);
+          },
+          function(err) {
+            console.log("custom routes get error", err);
+            return appUpdateCustomRoutes(customRoutesApi, {routes: []});
+          }
+        );
+      }
+    );
 
-	function addUpdatePaymentSettings(context, site) {
-		console.log("Adding payment settings for site", site.id);
-		var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
-		paymentSettingsClient.context[constants.headers.SITE] = site.id;
-		//GetExisting 
-		var paymentDef = getPaymentDef();
-		return paymentSettingsClient.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName :  paymentDef.namespace+"~"+paymentDef.name })
-		.then(function(paymentSettings){
-			return updateThirdPartyPaymentWorkflow(paymentSettingsClient, paymentSettings);
-		},function(err) {
-			return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
-		});
-	}
+    Promise.all(tasks).then(function(result) {
+      console.log("PayPal Express custom route installed");
+      enableActions(context, tenant);
+    }, function(error) {
+      self.cb(error);
+    });
 
-	function updateThirdPartyPaymentWorkflow(paymentSettingsClient, existingSettings) {
-		var paymentDef = getPaymentDef(existingSettings);
-		console.log(paymentDef);
-		paymentDef.isEnabled = existingSettings.isEnabled;
-		return paymentSettingsClient.deleteThirdPartyPaymentWorkflow({ "fullyQualifiedName" : paymentDef.namespace+"~"+paymentDef.name})
-		.then(function(result) {
-			return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
-		});
-	}
+  }
 
-	function enableActions() {
-		console.log("installing code actions");
-		var installer = new ActionInstaller({ context: self.ctx.apiContext });
-	 	installer.enableActions(self.ctx, null, {
-			"http.storefront.pages.global.request.before" : function(settings) {
-				settings = settings || {};
-				settings.timeoutMilliseconds = 15000;
-				return settings;
-			},
-			"embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
-				settings = settings || {};
-				settings.timeoutMilliseconds = 15000;
-				return settings;
-			}
+  function appUpdateCustomRoutes(customRoutesApi, customRoutes) {
+     console.log(customRoutes);
+      console.log("route array size", _.size(customRoutes.routes));
+      //Add / Update custom routes for paypal
+      customRoutes = getRoutes(customRoutes, "paypal/token","paypaltoken");
+      customRoutes = getRoutes(customRoutes, "paypal/checkout","paypalProcessor");
+      return customRoutesApi.updateCustomRouteSettings(customRoutes);
 
-		}).then(self.cb.bind(null,null), self.cb);	
-	}
+  }
+  
 
+  function addUpdatePaymentSettings(context, site) {
+    console.log("Adding payment settings for site", site.id);
+    var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
+    paymentSettingsClient.context[constants.headers.SITE] = site.id;
+    //GetExisting 
+    var paymentDef = getPaymentDef();
+    return paymentSettingsClient.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName :  paymentDef.namespace+"~"+paymentDef.name })
+    .then(function(paymentSettings){
+      return updateThirdPartyPaymentWorkflow(paymentSettingsClient, paymentSettings);
+    },function(err) {
+      return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
+    });
+  }
 
-	function getPaymentDef(existingSettings) {
-		return {
-		    "name": paymentConstants.PAYMENTSETTINGID,
-		    "namespace": context.get.nameSpace(),
-		    "isEnabled": "false",
-		    "description" : "<div style='font-size:13px;font-style:italic'>Please review our <a style='color:blue;' target='mozupaypalhelp' href='http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm'>Help</a> documentation to configure Paypal Express</div>",
-		    "credentials":  [
-			    	getPaymentActionFieldDef("Environment", paymentConstants.ENVIRONMENT, "RadioButton", false,getEnvironmentVocabularyValues(), existingSettings),
-			    	getPaymentActionFieldDef("User Name", paymentConstants.USERNAME, "TextBox", true,null,existingSettings),
-			    	getPaymentActionFieldDef("Password", paymentConstants.PASSWORD, "TextBox", true,null,existingSettings),
-			    	getPaymentActionFieldDef("Signature", paymentConstants.SIGNATURE, "TextBox", true,null,existingSettings),
-			    	getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "TextBox", false,null,existingSettings),
-			    	getPaymentActionFieldDef("Order Processing", paymentConstants.ORDERPROCESSING, "RadioButton", false,getOrderProcessingVocabularyValues(),existingSettings)
-			    ]
-			};
-	}
-	
-	function getEnvironmentVocabularyValues() {
-		return [
-			getVocabularyContent("production", "en-US", "Production"),
-			getVocabularyContent("sandbox", "en-US", "Sandbox")
-		];
-	}
+  function updateThirdPartyPaymentWorkflow(paymentSettingsClient, existingSettings) {
+    var paymentDef = getPaymentDef(existingSettings);
+    console.log(paymentDef);
+    paymentDef.isEnabled = existingSettings.isEnabled;
+    return paymentSettingsClient.deleteThirdPartyPaymentWorkflow({ "fullyQualifiedName" : paymentDef.namespace+"~"+paymentDef.name})
+    .then(function(result) {
+      return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
+    });
+  }
 
-	function getOrderProcessingVocabularyValues() {
-		return [
-			getVocabularyContent(paymentConstants.CAPTUREONSUBMIT, "en-US", "Authorize and Capture on Order Placement"),
-			getVocabularyContent(paymentConstants.CAPTUREONSHIPMENT, "en-US", "Authorize on Order Placement and Capture on Order Shipment")
-		];
-	}
+  function enableActions() {
+    console.log("installing code actions");
+    var installer = new ActionInstaller({ context: self.ctx.apiContext });
+    installer.enableActions(self.ctx, null, {
+      
+      "embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
+        settings = settings || {};
+        settings.timeoutMilliseconds = 5000;
+        return settings;
+      },
+      "http.storefront.routes" : function(settings) {
+        settings = settings || {};
+        settings.timeoutMilliseconds = 5000;
+        return settings;
+      }
 
-	function getVocabularyContent(key, localeCode, value) {
-		return {
-			"key" : key,
-			"contents" : [{
-				"localeCode" : localeCode,
-				"value" : value
-			}]
-		};
-	}
-
-	function getPaymentActionFieldDef(displayName, key, type, isSensitive, vocabularyValues, existingSettings) {
-		value = "";
-		if (existingSettings)
-			value = helper.getValue(existingSettings, key);
-
-		return {
-	          "displayName": displayName,
-	          "apiName": key,
-	          "inputType": type,
-	          "isSensitive": isSensitive,
-	          "vocabularyValues" : vocabularyValues,
-	          "value" : value
-		};
-	}
+    }).then(self.cb.bind(null,null), self.cb);  
+  }
 
 
+  function getPaymentDef(existingSettings) {
+    return {
+        "name": paymentConstants.PAYMENTSETTINGID,
+        "namespace": context.get.nameSpace(),
+        "isEnabled": "false",
+        "description" : "<div style='font-size:13px;font-style:italic'>Please review our <a style='color:blue;' target='mozupaypalhelp' href='http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm'>Help</a> documentation to configure Paypal Express</div>",
+        "credentials":  [
+            getPaymentActionFieldDef("Environment", paymentConstants.ENVIRONMENT, "RadioButton", false,getEnvironmentVocabularyValues(), existingSettings),
+            getPaymentActionFieldDef("User Name", paymentConstants.USERNAME, "TextBox", true,null,existingSettings),
+            getPaymentActionFieldDef("Password", paymentConstants.PASSWORD, "TextBox", true,null,existingSettings),
+            getPaymentActionFieldDef("Signature", paymentConstants.SIGNATURE, "TextBox", true,null,existingSettings),
+            getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "TextBox", false,null,existingSettings),
+            getPaymentActionFieldDef("Order Processing", paymentConstants.ORDERPROCESSING, "RadioButton", false,getOrderProcessingVocabularyValues(),existingSettings)
+          ]
+      };
+  }
+  
+  function getEnvironmentVocabularyValues() {
+    return [
+      getVocabularyContent("production", "en-US", "Production"),
+      getVocabularyContent("sandbox", "en-US", "Sandbox")
+    ];
+  }
+
+  function getOrderProcessingVocabularyValues() {
+    return [
+      getVocabularyContent(paymentConstants.CAPTUREONSUBMIT, "en-US", "Authorize and Capture on Order Placement"),
+      getVocabularyContent(paymentConstants.CAPTUREONSHIPMENT, "en-US", "Authorize on Order Placement and Capture on Order Shipment")
+    ];
+  }
+
+  function getVocabularyContent(key, localeCode, value) {
+    return {
+      "key" : key,
+      "contents" : [{
+        "localeCode" : localeCode,
+        "value" : value
+      }]
+    };
+  }
+
+  function getPaymentActionFieldDef(displayName, key, type, isSensitive, vocabularyValues, existingSettings) {
+    value = "";
+    if (existingSettings)
+      value = helper.getValue(existingSettings, key);
+
+    return {
+            "displayName": displayName,
+            "apiName": key,
+            "inputType": type,
+            "isSensitive": isSensitive,
+            "vocabularyValues" : vocabularyValues,
+            "value" : value
+    };
+  }
+
+
+  function getRoutes(customRoutes, template,action) {
+     var route =  {
+      "template": template,
+      "internalRoute": "Arcjs",
+      "functionId": action,
+     };
+
+     var index = _.findIndex(customRoutes.routes, function(route) {return route.functionId == action; } );
+     console.log("Action index "+action, index );
+      if (index <= -1)
+        customRoutes.routes[_.size(customRoutes.routes)] = route;
+      else
+        customRoutes.routes[index] = route;
+
+      return customRoutes;
+
+  }
 }
 
 module.exports = function(context, callback) {
- 	try {
-  		var appInstall = new AppInstall(context, callback);
-  		appInstall.initialize();
-  	} catch(e) {
-  		callback(e);
-  	}
+  try {
+      var appInstall = new AppInstall(context, callback);
+      appInstall.initialize();
+    } catch(e) {
+      callback(e);
+    }
 };
-},{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":9,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":42,"mozu-node-sdk/constants":44,"underscore":68}],2:[function(require,module,exports){
+},{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":9,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":42,"mozu-node-sdk/clients/commerce/settings/general/customRouteSettings":43,"mozu-node-sdk/constants":45,"underscore":69}],2:[function(require,module,exports){
 module.exports = {
 	PAYMENTSETTINGID : "PayPalExpress2",
 	ENVIRONMENT: "environment",
@@ -223,14 +274,11 @@ var helper = module.exports = {
 		var urlParseResult = url.parse(context.request.url);
 		queryStringParams = qs.parse(urlParseResult.query);
 		return queryStringParams;
-		/*console.log(context.request.params);
-		return context.request.params;*/
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
-		return (queryString.paypalCheckout === "1" && 
-			queryString.PayerID !== "" && 
-			queryString.token !== "" && (queryString.id !== "" || this.isCheckoutPage(context)) );
+		return (queryString.PayerID !== "" && 
+			queryString.token !== "" && queryString.id !== ""  );
 	},
 	getPaymentFQN: function(context) {
 		var appInfo = getAppInfo(context);
@@ -369,16 +417,17 @@ var helper = module.exports = {
 	}
 };
 
-},{"./constants":2,"mozu-action-helpers/get-app-info":8,"mozu-node-sdk/clients/commerce/cart":40,"mozu-node-sdk/clients/commerce/order":41,"mozu-node-sdk/constants":44,"querystring":67,"underscore":68,"url":73}],4:[function(require,module,exports){
+},{"./constants":2,"mozu-action-helpers/get-app-info":8,"mozu-node-sdk/clients/commerce/cart":40,"mozu-node-sdk/clients/commerce/order":41,"mozu-node-sdk/constants":45,"querystring":68,"underscore":69,"url":74}],4:[function(require,module,exports){
 module.exports = {
   
-  'embedded.platform.applications.install': {
+    'paypalInstall': {
       actionName: 'embedded.platform.applications.install',
-      customFunction: require('./domains/platform.applications/embedded.platform.applications.install')
-  }
+      customFunction: require('./domains/platform.applications/paypalInstall')
+  	}
+
 };
 
-},{"./domains/platform.applications/embedded.platform.applications.install":1}],5:[function(require,module,exports){
+},{"./domains/platform.applications/paypalInstall":1}],5:[function(require,module,exports){
 // http://wiki.commonjs.org/wiki/Unit_Testing/1.0
 //
 // THIS IS NOT TESTED NOR LIKELY TO WORK OUTSIDE V8!
@@ -739,7 +788,7 @@ var objectKeys = Object.keys || function (obj) {
   return keys;
 };
 
-},{"util/":75}],6:[function(require,module,exports){
+},{"util/":76}],6:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -1626,7 +1675,7 @@ function ensureString(something) {
 function ensureMessage(res) {
   return res.message || res.body && res.body.message;
 }
-},{"./tiny-extend":34,"util":75}],25:[function(require,module,exports){
+},{"./tiny-extend":34,"util":76}],25:[function(require,module,exports){
 'use strict';
 // BEGIN INIT
 
@@ -1700,7 +1749,7 @@ module.exports = function (templateText) {
     keysUsed: findKeys(templateText)
   };
 };
-},{"uri-template":69}],27:[function(require,module,exports){
+},{"uri-template":70}],27:[function(require,module,exports){
 'use strict';
 
 var extend = require('./tiny-extend');
@@ -1917,7 +1966,7 @@ module.exports = function (options, transform) {
     request.end();
   });
 };
-},{"../constants":13,"./errorify":24,"./parse-json-dates":29,"./stream-to-callback":31,"./tiny-extend":34,"http":undefined,"https":undefined,"url":73}],31:[function(require,module,exports){
+},{"../constants":13,"./errorify":24,"./parse-json-dates":29,"./stream-to-callback":31,"./tiny-extend":34,"http":undefined,"https":undefined,"url":74}],31:[function(require,module,exports){
 'use strict';
 
 module.exports = function streamToCallback(stream, cb) {
@@ -1951,7 +2000,7 @@ module.exports = function sub(cons, proto) {
     if (proto) extend(child.prototype, proto);
     return child;
 };
-},{"./tiny-extend":34,"util":75}],33:[function(require,module,exports){
+},{"./tiny-extend":34,"util":76}],33:[function(require,module,exports){
 'use strict';
 
 var TenantClient = undefined;
@@ -2011,7 +2060,7 @@ module.exports = function findup(filename) {
   }
   return exists && maybeFile;
 };
-},{"fs":undefined,"path":62}],36:[function(require,module,exports){
+},{"fs":undefined,"path":63}],36:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -2124,7 +2173,7 @@ extend(Client, {
 
 module.exports = Client;
 
-},{"./constants":44,"./plugins/in-memory-auth-cache":45,"./utils/get-config":49,"./utils/make-method":50,"./utils/normalize-context":52,"./utils/sub":58,"./utils/tiny-extend":59}],40:[function(require,module,exports){
+},{"./constants":45,"./plugins/in-memory-auth-cache":46,"./utils/get-config":50,"./utils/make-method":51,"./utils/normalize-context":53,"./utils/sub":59,"./utils/tiny-extend":60}],40:[function(require,module,exports){
 
 
 //------------------------------------------------------------------------------
@@ -2276,8 +2325,41 @@ module.exports = Client.sub({
 });
 
 },{"../../../../client":39}],43:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getCustomRouteSettings: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
+	}),
+	createCustomRouteSettings: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
+	}),
+	updateCustomRouteSettings: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
+	}),
+	deleteCustomRouteSettings: Client.method({
+		method: constants.verbs.DELETE,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes'
+	})
+});
+
+},{"../../../../client":39}],44:[function(require,module,exports){
 arguments[4][11][0].apply(exports,arguments)
-},{"../../client":39,"dup":11}],44:[function(require,module,exports){
+},{"../../client":39,"dup":11}],45:[function(require,module,exports){
 var version = require('./version'),
     DEVELOPER = 1,
     ADMINUSER = 2,
@@ -2337,7 +2419,7 @@ module.exports = {
   version: version.current
 };
 
-},{"./version":61}],45:[function(require,module,exports){
+},{"./version":62}],46:[function(require,module,exports){
 var assert = require('assert');
 
 function isExpired(ticket) {
@@ -2392,7 +2474,7 @@ var InMemoryAuthCache = module.exports = function InMemoryAuthCache() {
     constructor: InMemoryAuthCache
   };
 };
-},{"assert":5}],46:[function(require,module,exports){
+},{"assert":5}],47:[function(require,module,exports){
 /* global Promise */
 'use strict';
 var constants = require('../constants'),
@@ -2513,7 +2595,7 @@ var AuthProvider = {
 
 module.exports = AuthProvider;
 
-},{"../constants":44,"./auth-ticket":47,"when/es6-shim/Promise.browserify-es6":76}],47:[function(require,module,exports){
+},{"../constants":45,"./auth-ticket":48,"when/es6-shim/Promise.browserify-es6":77}],48:[function(require,module,exports){
 
 /**
  * The authentication ticket used to authenticate anything.
@@ -2534,7 +2616,7 @@ function AuthTicket(json) {
 }
 
 module.exports = AuthTicket;
-},{}],48:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 var extend = require('./tiny-extend');
 var util = require('util');
 module.exports = function errorify(res, additions) {
@@ -2580,7 +2662,7 @@ function formatDetails(deets) {
   }).join('\n') + '\n';
 }
 
-},{"./tiny-extend":59,"util":75}],49:[function(require,module,exports){
+},{"./tiny-extend":60,"util":76}],50:[function(require,module,exports){
 // BEGIN INIT
 var fs = require('fs');
 var findup = require('./tiny-findup');
@@ -2615,7 +2697,7 @@ module.exports = function getConfig() {
   return conf;
 };
 
-},{"./tiny-findup":60,"fs":undefined}],50:[function(require,module,exports){
+},{"./tiny-findup":61,"fs":undefined}],51:[function(require,module,exports){
 'use strict';
 var extend = require('./tiny-extend'),
     request = require('./request'),
@@ -2681,7 +2763,7 @@ module.exports = function(config) {
 };
 
 
-},{"./make-url":51,"./prerequisite-manager":54,"./promise-pipeline":55,"./request":56,"./tiny-extend":59}],51:[function(require,module,exports){
+},{"./make-url":52,"./prerequisite-manager":55,"./promise-pipeline":56,"./request":57,"./tiny-extend":60}],52:[function(require,module,exports){
 'use strict';
 var uritemplate = require('uritemplate'),
 extend = require('./tiny-extend');
@@ -2736,7 +2818,7 @@ module.exports = function makeUrl(client, tpt, body) {
   };
 };
 
-},{"./tiny-extend":59,"uritemplate":72}],52:[function(require,module,exports){
+},{"./tiny-extend":60,"uritemplate":73}],53:[function(require,module,exports){
 var extend = require('./tiny-extend');
 
 var priorities = {
@@ -2804,14 +2886,14 @@ module.exports = function(context) {
 //     return [older, newer];
 //   }, contextPair);
 // }
-},{"./tiny-extend":59}],53:[function(require,module,exports){
+},{"./tiny-extend":60}],54:[function(require,module,exports){
 'use strict';
 var reISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*))(?:Z|(\+|-)([\d|:]*))?$/;
 module.exports = function parseDate(key, value) {
   return (typeof value === 'string' && reISO.exec(value)) ? new Date(value) : value;
 };
 
-},{}],54:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 var AuthProvider = require('../security/auth-provider'),
     scopes = require('../constants').scopes;
 
@@ -2923,7 +3005,7 @@ module.exports = {
   getTasks: getTasks
 };
 
-},{"../clients/platform/tenant":43,"../constants":44,"../security/auth-provider":46}],55:[function(require,module,exports){
+},{"../clients/platform/tenant":44,"../constants":45,"../security/auth-provider":47}],56:[function(require,module,exports){
 /* global Promise */
 require('when/es6-shim/Promise.browserify-es6');
 
@@ -2933,7 +3015,7 @@ module.exports = function promisePipeline(tasks) {
     return p.then(task);
   }, Promise.resolve());
 };
-},{"when/es6-shim/Promise.browserify-es6":76}],56:[function(require,module,exports){
+},{"when/es6-shim/Promise.browserify-es6":77}],57:[function(require,module,exports){
 /* global Promise */
 var constants = require('../constants');
 var extend = require('./tiny-extend');
@@ -3049,7 +3131,7 @@ module.exports = function(options, transform) {
   });
 };
 
-},{"../constants":44,"./errorify":48,"./parse-json-dates":53,"./stream-to-callback":57,"./tiny-extend":59,"http":undefined,"https":undefined,"path":62,"url":73,"when/es6-shim/Promise.browserify-es6":76}],57:[function(require,module,exports){
+},{"../constants":45,"./errorify":49,"./parse-json-dates":54,"./stream-to-callback":58,"./tiny-extend":60,"http":undefined,"https":undefined,"path":63,"url":74,"when/es6-shim/Promise.browserify-es6":77}],58:[function(require,module,exports){
 module.exports = function streamToCallback(stream, cb) {
   var buf = '';
   stream.setEncoding('utf8');
@@ -3061,7 +3143,7 @@ module.exports = function streamToCallback(stream, cb) {
     cb(null, buf);
   });
 };
-},{}],58:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
 var util = require('util'),
     extend = require('./tiny-extend');
 
@@ -3079,7 +3161,7 @@ module.exports = function sub(cons, proto) {
   if (proto) extend(child.prototype, proto);
   return child;
 };
-},{"./tiny-extend":59,"util":75}],59:[function(require,module,exports){
+},{"./tiny-extend":60,"util":76}],60:[function(require,module,exports){
 module.exports = function extend(target) {
   return Array.prototype.slice.call(arguments,1).reduce(function(out, next) {
     if (next && typeof next === "object") {
@@ -3090,7 +3172,7 @@ module.exports = function extend(target) {
     return out;
   }, target);
 };
-},{}],60:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 var path = require('path');
 var fs = require('fs');
 
@@ -3106,11 +3188,11 @@ module.exports = function findup(filename) {
   }
   return exists && maybeFile;
 };
-},{"fs":undefined,"path":62}],61:[function(require,module,exports){
+},{"fs":undefined,"path":63}],62:[function(require,module,exports){
 module.exports = {
   current: "1.18.15236.0"
 };
-},{}],62:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3336,7 +3418,7 @@ var substr = 'ab'.substr(-1) === 'b'
     }
 ;
 
-},{}],63:[function(require,module,exports){
+},{}],64:[function(require,module,exports){
 module.exports = function pctEncode(regexp) {
   regexp = regexp || /\W/g;
   return function encode(string) {
@@ -3361,7 +3443,7 @@ module.exports = function pctEncode(regexp) {
   }
 }
 
-},{}],64:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
 /*! https://mths.be/punycode v1.3.2 by @mathias */
 ;(function(root) {
 
@@ -3893,7 +3975,7 @@ module.exports = function pctEncode(regexp) {
 
 }(this));
 
-},{}],65:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3979,7 +4061,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],66:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4066,13 +4148,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],67:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":65,"./encode":66}],68:[function(require,module,exports){
+},{"./decode":66,"./encode":67}],69:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -5622,7 +5704,7 @@ exports.encode = exports.stringify = require('./encode');
   }
 }.call(this));
 
-},{}],69:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 module.exports = (function(){
   /*
    * Generated by PEG.js 0.7.0.
@@ -6349,7 +6431,7 @@ module.exports = (function(){
   return result;
 })();
 
-},{"./lib/classes":70}],70:[function(require,module,exports){
+},{"./lib/classes":71}],71:[function(require,module,exports){
 // Generated by CoffeeScript 1.6.3
 (function() {
   var FormContinuationExpression, FormStartExpression, FragmentExpression, LabelExpression, NamedExpression, PathParamExpression, PathSegmentExpression, ReservedExpression, SimpleExpression, Template, encoders, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
@@ -6768,7 +6850,7 @@ module.exports = (function(){
 
 }).call(this);
 
-},{"./encoders":71}],71:[function(require,module,exports){
+},{"./encoders":72}],72:[function(require,module,exports){
 // Generated by CoffeeScript 1.6.3
 (function() {
   var pctEncode;
@@ -6781,7 +6863,7 @@ module.exports = (function(){
 
 }).call(this);
 
-},{"pct-encode":63}],72:[function(require,module,exports){
+},{"pct-encode":64}],73:[function(require,module,exports){
 /*global unescape, module, define, window, global*/
 
 /*
@@ -7668,7 +7750,7 @@ var UriTemplate = (function () {
     }
 ));
 
-},{}],73:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -8377,14 +8459,14 @@ function isNullOrUndefined(arg) {
   return  arg == null;
 }
 
-},{"punycode":64,"querystring":67}],74:[function(require,module,exports){
+},{"punycode":65,"querystring":68}],75:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],75:[function(require,module,exports){
+},{}],76:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -8972,7 +9054,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-},{"./support/isBuffer":74,"inherits":6}],76:[function(require,module,exports){
+},{"./support/isBuffer":75,"inherits":6}],77:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */
@@ -8987,7 +9069,7 @@ module.exports = typeof global != 'undefined' ? (global.Promise = PromiseConstru
 	           : typeof self   != 'undefined' ? (self.Promise   = PromiseConstructor)
 	           : PromiseConstructor;
 
-},{"../lib/Promise":77,"../lib/decorators/unhandledRejection":79}],77:[function(require,module,exports){
+},{"../lib/Promise":78,"../lib/decorators/unhandledRejection":80}],78:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */
@@ -9006,7 +9088,7 @@ define(function (require) {
 });
 })(typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); });
 
-},{"./Scheduler":78,"./env":80,"./makePromise":82}],78:[function(require,module,exports){
+},{"./Scheduler":79,"./env":81,"./makePromise":83}],79:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */
@@ -9088,7 +9170,7 @@ define(function() {
 });
 }(typeof define === 'function' && define.amd ? define : function(factory) { module.exports = factory(); }));
 
-},{}],79:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */
@@ -9176,7 +9258,7 @@ define(function(require) {
 });
 }(typeof define === 'function' && define.amd ? define : function(factory) { module.exports = factory(require); }));
 
-},{"../env":80,"../format":81}],80:[function(require,module,exports){
+},{"../env":81,"../format":82}],81:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */
@@ -9251,7 +9333,7 @@ define(function(require) {
 });
 }(typeof define === 'function' && define.amd ? define : function(factory) { module.exports = factory(require); }));
 
-},{}],81:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */
@@ -9309,7 +9391,7 @@ define(function() {
 });
 }(typeof define === 'function' && define.amd ? define : function(factory) { module.exports = factory(); }));
 
-},{}],82:[function(require,module,exports){
+},{}],83:[function(require,module,exports){
 /** @license MIT License (c) copyright 2010-2014 original author or authors */
 /** @author Brian Cavalier */
 /** @author John Hann */

@@ -1,5 +1,5 @@
 #PayPal Express Integration for Mozu (Using Arc.js)
-###Version 0.1.0
+###Version 1.1.0
 
 The [PayPal Express](https://developer.paypal.com/docs/classic/products/express-checkout/) Integration for Mozu uses the [Arc.js](http://developer.mozu.com/content/arcjs/Arcjs_Intro.htm) framework to create custom actions that enable merchants to add PayPal’s Express Checkout functionality to sites on the Mozu platform. This readme describes how to use the code in this repository to enable PayPal Express on your Mozu site.
 
