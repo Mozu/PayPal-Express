@@ -56,7 +56,6 @@ var Order = require("mozu-node-sdk/clients/commerce/order");
 var FulfillmentInfo = require('mozu-node-sdk/clients/commerce/orders/fulfillmentInfo');
 var OrderPayment = require('mozu-node-sdk/clients/commerce/orders/payment');
 var OrderShipment =  require('mozu-node-sdk/clients/commerce/orders/shipment');
-
 var helper = require("./helper");
 var paymentHelper = require('./paymenthelper');
 
@@ -175,6 +174,8 @@ function setShippingMethod(context, order, existingShippingMethodCode) {
 		order.fulfillmentInfo.shippingMethodCode = shippingMethod.shippingMethodCode;
         order.fulfillmentInfo.shippingMethodName = shippingMethod.shippingMethodName;
 		console.log("Fulfillment with shippingMethod", order.fulfillmentInfo);
+		order.items = null;
+		order.payments = null;
         return helper.createClientFromContext(Order, context).updateOrder({orderId: order.id, version:''}, {body: order});
 	});
 }
