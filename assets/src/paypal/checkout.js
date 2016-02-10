@@ -57,6 +57,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
         },
         "address" : {
           "address1" : paypalOrder.SHIPTOSTREET,
+          "address2" : paypalOrder.SHIPTOSTREET2,
           "cityOrTown" : paypalOrder.SHIPTOCITY,
           "stateOrProvince": paypalOrder.SHIPTOSTATE,
           "postalOrZipCode": paypalOrder.SHIPTOZIP,
@@ -187,7 +188,7 @@ var paypalCheckout = module.exports = {
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
 				response.order.maxAmount = context.configuration.paypal.setExpressCheckout.maxAmount;
 
-			console.log(response.order);
+			
 			return client.setExpressCheckoutPayment(
 					response.order,
 					redirectUrl,
@@ -222,7 +223,6 @@ var paypalCheckout = module.exports = {
 					var existingShippingMethodCode = order.fulfillmentInfo.shippingMethodCode;
 					var shipItems = _.filter(order.items,function(item) {return item.fulfillmentMethod === "Ship";});
 					var requiresFulfillmentInfo = false;
-					console.log("ship Items", shipItems);
 					if (shipItems && shipItems.length > 0)
 						requiresFulfillmentInfo = true;
 					console.log("requiresFulfillmentInfo", requiresFulfillmentInfo);
@@ -243,13 +243,13 @@ var paypalCheckout = module.exports = {
 			
 			return client.getExpressCheckoutDetails(token).
 			then(function(paypalOrder) {
+				console.log("paypal order", paypalOrder);
 				response.paypalOrder = paypalOrder;
 				return response;
 			});
 		}).then(function(response){
 			//set Shipping address
 			if (!response.requiresFulfillmentInfo) return response;
-			console.log(response.order);
 			return setFulfillmentInfo(context, response.order.id, response.paypalOrder).
 			then(function(fulfillmentInfo) {
 				response.order.fulfillmentInfo = fulfillmentInfo;
