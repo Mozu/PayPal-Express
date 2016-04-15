@@ -40,17 +40,17 @@ function convertCartToOrder(context, id, isCart) {
 	else {
 		console.log("Getting existing order");
 		return helper.getOrder(context, id, isCart);
-	}	
+	}
 }
 
 function setFulfillmentInfo(context, id, paypalOrder) {
 	console.log("ship to name",paypalOrder.SHIPTONAME);
 	var shipToName = paypalOrder.SHIPTONAME.split(/\s+/g);
 	console.log("shiptoname",shipToName);
-	var fulfillmentInfo = { 
-		"fulfillmentContact" : { 
-        "firstName" : shipToName[0], 
-        "lastNameOrSurname" : shipToName[1], 
+	var fulfillmentInfo = {
+		"fulfillmentContact" : {
+        "firstName" : shipToName[0],
+        "lastNameOrSurname" : shipToName[1],
         "email" : paypalOrder.EMAIL,
         "phoneNumbers" : {
           "home" : paypalOrder.SHIPTOPHONENUM || "N/A"
@@ -75,19 +75,20 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 function setPayment(context, order, token, payerId, email) {
 
 	if (order.amountRemainingForPayment < 0) return order;
-	var registeredShopper = getUserEmail(context);	
+	var registeredShopper = getUserEmail(context);
 	console.log("Setting payment..amount amountRemainingForPayment", order.amountRemainingForPayment);
 	var billingInfo =  {
 		"amount" : order.amountRemainingForPayment,
 		"currencyCode": order.currencyCode,
-		"newBillingInfo":  
-	    {   
+		"newBillingInfo":
+	    {
 	        "paymentType": paymentConstants.PAYMENTSETTINGID,
 	        "paymentWorkflow": paymentConstants.PAYMENTSETTINGID,
 	        "card" : null,
 	        "billingContact" : {
 	            "email": registeredShopper || email
 	        },
+          "externalTransactionId" : token,
 	        "isSameBillingShippingAddress" : false,
 	         "data" : {
 	        	"paypal": {
@@ -96,9 +97,9 @@ function setPayment(context, order, token, payerId, email) {
         	}
 	    },
 	    "externalTransactionId" : token
-       
+
 	};
-    
+
     console.log("Billing Info", billingInfo);
     return helper.createClientFromContext(OrderPayment, context).
     createPaymentAction({orderId: order.id},{body: billingInfo});
@@ -115,7 +116,7 @@ function setShippingMethod(context, order, existingShippingMethodCode) {
 		var shippingMethod = "";
         if (existingShippingMethodCode)
             shippingMethod = _.findWhere(methods, {shippingMethodCode: existingShippingMethodCode});
-        
+
         if (!shippingMethod || !shippingMethod.shippingMethodCode)
             shippingMethod =_.min(methods, function(method){return method.price;});
 
@@ -168,7 +169,7 @@ var paypalCheckout = module.exports = {
 			redirectUrl = redirectUrl + "&" + paramsToPreserve;
 			cancelUrl = redirectUrl + (isCart ? "?" : "&") + paramsToPreserve;
 		}
-		
+
 		return paymentHelper.getPaymentConfig(context).then(function(config) {
 			if (!config.enabled) return callback();
 
@@ -179,8 +180,8 @@ var paypalCheckout = module.exports = {
 					config: config,
 					order: helper.getOrderDetails(order,true )
 				};
-				
-			});	
+
+			});
 		}).then(function(response) {
 			var client = paymentHelper.getPaypalClient(response.config);
 			client.setPayOptions(1,0,0);
@@ -188,7 +189,7 @@ var paypalCheckout = module.exports = {
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
 				response.order.maxAmount = context.configuration.paypal.setExpressCheckout.maxAmount;
 
-			
+
 			return client.setExpressCheckoutPayment(
 					response.order,
 					redirectUrl,
@@ -201,12 +202,12 @@ var paypalCheckout = module.exports = {
 		var self = this;
 
 		//var queryString = helper.parseUrl(context);
-		
+
 		var id = queryString.id;
 		var token = queryString.token;
 		var payerId = queryString.PayerID;
 		//var isCart = queryString.isCart == "1";
-		
+
 		console.log("PayerId", payerId);
 		console.log("Token", token);
 		console.log("Id", id);
@@ -228,8 +229,8 @@ var paypalCheckout = module.exports = {
 					console.log("requiresFulfillmentInfo", requiresFulfillmentInfo);
 
 					return {
-						config: config, 
-						order: order, 
+						config: config,
+						order: order,
 						requiresFulfillmentInfo: requiresFulfillmentInfo,
 						existingShippingMethodCode : order.fulfillmentInfo.shippingMethodCode
 					};
@@ -240,7 +241,7 @@ var paypalCheckout = module.exports = {
 			var client = paymentHelper.getPaypalClient(response.config);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
-			
+
 			return client.getExpressCheckoutDetails(token).
 			then(function(paypalOrder) {
 				console.log("paypal order", paypalOrder);
@@ -274,7 +275,7 @@ var paypalCheckout = module.exports = {
 	processPayment: function(context, callback) {
 		var self = this;
 		var paymentAction = context.get.paymentAction();
-	    var payment = context.get.payment();    
+	    var payment = context.get.payment();
 
 	    console.log("Payment Action", paymentAction);
 	    console.log("Payment", payment);
@@ -334,7 +335,7 @@ var paypalCheckout = module.exports = {
 				}
 				else if (paypalError.errorMessage)
 					message = paypalError.errorMessage;
-				
+
 				context.response.viewData.paypalError = paypalError;
 			}
 		}

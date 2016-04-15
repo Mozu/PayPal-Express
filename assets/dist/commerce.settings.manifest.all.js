@@ -5,7 +5,6 @@ module.exports = {
       actionName: 'http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before',
       customFunction: require('./domains/commerce.settings/paypalValidator')
   }
-
 };
 
 },{"./domains/commerce.settings/paypalValidator":2}],2:[function(require,module,exports){
@@ -98,7 +97,7 @@ var helper = module.exports = {
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
-		return (queryString.PayerID !== "" && 
+		return (queryString.PayerID !== "" &&
 			queryString.token !== "" && queryString.id !== ""  );
 	},
 	getPaymentFQN: function(context) {
@@ -121,6 +120,7 @@ var helper = module.exports = {
 		delete params.isCart;
 		delete params.PayerID;
 		delete params.paypalCheckout;
+    delete params.ppErrorId;
 		var queryString = "";
 		Object.keys(params).forEach(function(key){
 			if (queryString !== "")
@@ -156,8 +156,8 @@ var helper = module.exports = {
     	var self = this;
 		var items=	_.map(order.items, function(item) {
 			return 	{
-				name: item.product.name, 
-				quantity: item.quantity, 
+				name: item.product.name,
+				quantity: item.quantity,
 				amount: item.discountedTotal/item.quantity,
 				lineId: item.lineId//,
 				//taxAmount: item.itemTaxTotal
@@ -170,7 +170,7 @@ var helper = module.exports = {
 
 
 		/*if (order.shippingDiscounts) {
-			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));	
+			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));
 		}*/
 
 		if (order.handlingDiscount) {
@@ -195,11 +195,14 @@ var helper = module.exports = {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal,
-			handlingAmount: order.handlingTotal+order.dutyTotal,
+			handlingAmount: order.handlingTotal,
 			shippingAmount: order.shippingTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
-		}; 
+		};
+
+    if (order.dutyTotal)
+      orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
@@ -212,7 +215,7 @@ var helper = module.exports = {
 			orderDetails.currencyCode = order.currencyCode;
 		}
 
-		if (includeShipping) 
+		if (includeShipping)
 			orderDetails.email = order.email;
 
 		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
@@ -234,7 +237,7 @@ var helper = module.exports = {
 		if (isCart)
 			return Cart.getCart({cartId: id});
 		else
-			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});	
+			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});
 	}
 };
 
@@ -271,7 +274,7 @@ module.exports = {
 					enabled: paypalSettings.isEnabled
 				};
 	},
-	
+
 	getPaypalClient: function (config) {
 		return new Paypal.create(config.userName, config.password, config.signature, config.environment === "sandbox");
 	},
@@ -296,7 +299,7 @@ module.exports = {
   			if (result.PAL !== config.merchantId)
   				callback("Paypal Express - MerchantId does not match with value on record.");
   			else
-	  			callback();	
+	  			callback();
   		}, function(e){
   			console.error(e);
   			callback("Paypal Express - User Name/Password/Signatue is invalid");
@@ -361,7 +364,7 @@ module.exports = {
 	    console.log("Payment interaction Type", interactionType);
 
 	    var interaction  =  {status: paymentResult.status, interactionType: interactionType};
-	    if (paymentResult.amount) 
+	    if (paymentResult.amount)
 	      interaction.amount = paymentResult.amount;
 
 	    if (paymentResult.transactionId)
@@ -384,41 +387,57 @@ module.exports = {
   	},
   	authorizePayment: function (context, config, paymentAction, payment) {
   		var self = this;
-		var payerId = payment.billingInfo.data.paypal.payerId;
-		return helper.getOrder(context, payment.orderId, false).then(function(order) {
-			var details = helper.getOrderDetails(order,false, paymentAction);
-			details.token= payment.externalTransactionId;
-			details.payerId= payerId;
+  		return helper.getOrder(context, payment.orderId, false).then(function(order) {
+  			var details = helper.getOrderDetails(order,false, paymentAction);
 
+        var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
 
-			return details;
-		}).then(function(order){
-			console.log(order);
-			var client = self.getPaypalClient(config);
-			if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
-				order.testAmount = context.configuration.paypal.authorization.amount;
+        if (existingPayment) {
+          details.token = existingPayment.externalTransactionId;
+          details.payerId = existingPayment.billingInfo.data.paypal.payerId;
 
-			return client.authorizePayment(order).
-				then(function(result) {
-					return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
-				}, function(err) {
-					return self.getPaymentResult(err, paymentConstants.DECLINED, paymentAction.amount);
-				});	
-		}).then(function(authResult) {
-			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT)
-				return authResult;
-			//Capture payment
-			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+          var existingAuth = _.find(existingPayment.interactions, function(interaction)  { return interaction.interactionType === "Authorization" && interaction.status === paymentConstants.AUTHORIZED && interaction.gatewayResponseCode=== "200";});
+          details.existingAuth = existingAuth;
+        } else {
+          details.token= payment.externalTransactionId;
+          details.payerId =  payment.billingInfo.data.paypal.payerId;
+        }
+  			return details;
+  		}).then(function(order){
+  			console.log(order);
+  			var client = self.getPaypalClient(config);
+  			if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
+  				order.testAmount = context.configuration.paypal.authorization.amount;
 
-			return self.captureAmount(context, config, paymentAction, payment)
-					.then(function(captureResult) {
-						captureResult.captureOnAuthorize = true;
-						return captureResult;
-					});
-		}).catch(function(err) {
-			console.error("Authorize error",err);
-			return self.getPaymentResult({statusText: err}, paymentConstants.FAILED, paymentAction.amount);
-		});
+        if (order.existingAuth) {
+          console.log("Using existing authorization", order.existingAuth);
+          //var response = order.existingAuth.gatewayResponseText.split(" - ");
+          var response = self.getPaymentResult({status: "Success",transactionId: order.existingAuth.gatewayTransactionId, ack: "success" }, paymentConstants.AUTHORIZED, paymentAction.amount);
+          response.responseText = order.existingAuth.gatewayResponseText;
+          return response;
+        }
+
+  			return client.authorizePayment(order).
+  				then(function(result) {
+  					return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
+  				}, function(err) {
+  					return self.getPaymentResult(err, paymentConstants.DECLINED, paymentAction.amount);
+  				});
+  		}).then(function(authResult) {
+  			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT)
+  				return authResult;
+  			//Capture payment
+  			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+
+  			return self.captureAmount(context, config, paymentAction, payment)
+  					.then(function(captureResult) {
+  						captureResult.captureOnAuthorize = true;
+  						return captureResult;
+  					});
+  		}).catch(function(err) {
+  			console.error("Authorize error",err);
+  			return self.getPaymentResult({statusText: err}, paymentConstants.FAILED, paymentAction.amount);
+  		});
 	},
 	captureAmount: function (context, config, paymentAction, payment) {
   		var self = this;
@@ -445,18 +464,18 @@ module.exports = {
 		      return response;
 		    }
 		    var client = self.getPaypalClient(config);
-
+        var isPartial =  true;
 		    if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 				paymentAction.amount = context.configuration.paypal.capture.amount;
 
 		    return client.doCapture(payment.externalTransactionId,order.orderNumber,
-		    								paymentAuthorizationInteraction.gatewayTransactionId, 
-		    								paymentAction.amount, paymentAction.currencyCode)
+		    								paymentAuthorizationInteraction.gatewayTransactionId,
+		    								paymentAction.amount, paymentAction.currencyCode, isPartial)
 		    	.then(function(captureResult){
 		         	return self.getPaymentResult(captureResult,paymentConstants.CAPTURED, paymentAction.amount);
 		    	}, function(err) {
 		    		return self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount);
-		    	});	
+		    	});
 		}).catch(function(err) {
 			console.error("Capture Error ",err);
 			return self.getPaymentResult({statusText: err}, paymentConstants.DECLINED, paymentAction.amount);
@@ -470,14 +489,14 @@ module.exports = {
 	      console.log("AWS Refund, previous capturedInteraction", capturedInteraction);
 	      if (!capturedInteraction) {
 	        return {status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment has not been captured to issue refund"};
-	      } 
+	      }
 
 	      if (paymentAction.manualGatewayInteraction) {
 	        console.log("Manual credit...dont send to Paypal");
 	        return {amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.CREDITED,
 	                transactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId};
 	      }
-	      
+
 	      var fullRefund = paymentAction.amount === capturedInteraction.amount;
 	      var client = self.getPaypalClient(config);
 
@@ -492,7 +511,7 @@ module.exports = {
 	        return self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount);
 	      });
 		//});
-		
+
 		//return promise;
 	},
 	voidPayment: function(context,config, paymentAction, payment) {
@@ -508,10 +527,10 @@ module.exports = {
 			console.log("Void Payment - Captured interaction", capturedInteraction);
 			if (capturedInteraction) {
 			  return {status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment with captures cannot be voided. Please issue a refund"};
-			} 
+			}
 
 			var authorizedInteraction = self.getInteractionByStatus(payment.interactions,paymentConstants.AUTHORIZED);
-			if (!authorizedInteraction) 
+			if (!authorizedInteraction)
 			  return {status: paymentConstants.VOIDED, amount: paymentAction.amount};
 			var client = self.getPaypalClient(config);
 
@@ -524,7 +543,7 @@ module.exports = {
 				},
 				function(err) {
 					console.error("Void Payment", err);
-					return self.getPaymentResult(result,paymentConstants.FAILED, paymentAction.amount );	
+					return self.getPaymentResult(result,paymentConstants.FAILED, paymentAction.amount );
 				}
 			);
 
@@ -532,6 +551,7 @@ module.exports = {
 		//return promise;
 	}
 };
+
 },{"./constants":3,"./helper":4,"./paypalsdk":6,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":232,"mozu-node-sdk/clients/commerce/settings/generalSettings":233,"underscore":301}],6:[function(require,module,exports){
 var urlParser = require('url');
 var https = require('https');
@@ -559,7 +579,7 @@ Paypal.prototype.params = function() {
 		VERSION: '117.0',
 	};
 
-	return result; 
+	return result;
 };
 
 function prepareNumber(num, doubleZero) {
@@ -597,7 +617,7 @@ Paypal.prototype.setOrderParams = function(order) {
 	if (order.email) {
 		params.EMAIL = order.email;
 	}
-
+  console.log("Set order params", order);
 	if (order.testAmount)
 		params.PAYMENTREQUEST_0_AMT = order.testAmount;
 	else {
@@ -614,12 +634,16 @@ Paypal.prototype.setOrderParams = function(order) {
 			params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
 
 		if (order.shippingDiscount)
-			params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);		
+			params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);
 
 		if (order.items) {
-			params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(order.items, function(sum, item) {return sum+(item.amount*item.quantity);},0));
+      var itemSum = _.reduce(order.items, function(sum, item) {
+        console.log(parseFloat(sum)+"--"+parseFloat(item.amount)+" -- "+item.quantity);
+        return parseFloat(sum)+ parseFloat(item.amount*item.quantity);},0);
+      console.log("Item sum", itemSum.toFixed(2));
+			params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(itemSum.toFixed(2));
 			self.setProducts(order.items);
-			params = _.extend(params, this.getItemsParams());	
+			params = _.extend(params, this.getItemsParams());
 		}
 	}
 
@@ -631,7 +655,7 @@ Paypal.prototype.setOrderParams = function(order) {
 		//params.ADDROVERRIDE = 1;
 		params.PAYMENTREQUEST_0_SHIPTONAME = order.shippingAddress.firstName + " " + order.shippingAddress.lastName;
 		params.PAYMENTREQUEST_0_SHIPTOSTREET = order.shippingAddress.address1;
-		if (order.shippingAddress.address2) 
+		if (order.shippingAddress.address2)
 			params.PAYMENTREQUEST_0_SHIPTOSTREET2 = order.shippingAddress.address2;
 		params.PAYMENTREQUEST_0_SHIPTOCITY = order.shippingAddress.cityOrTown;
 		params.PAYMENTREQUEST_0_SHIPTOSTATE = order.shippingAddress.stateOrProvince;
@@ -656,13 +680,13 @@ Paypal.prototype.getExpressCheckoutDetails = function(token) {
 
 Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUrl) {
 	var self = this;
-	
-	
+
+
 	var params = self.setOrderParams(order);
 	/*params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
 	//params.PAYMENTREQUEST_0_DESC = description;
 	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
-	
+
 	if (order.taxAmount)
 		params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
 	if (order.handlingAmount)
@@ -674,9 +698,9 @@ Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUr
 	if (order.items) {
 		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(orderDetails.items, function(sum, item) {return sum+item.amount;},0));
 		self.setProducts(order.items);
-		params = _.extend(params, this.getItemsParams());	
+		params = _.extend(params, this.getItemsParams());
 	}*/
-	
+
 
 	params.PAYMENTREQUEST_0_PAYMENTACTION = 'Authorization';
 
@@ -693,8 +717,8 @@ Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUr
 	console.log("set express checkout request", params);
 	return self.request(params).then(function(data) {
 		console.log("Set express checkout",data);
-			return { 
-				redirectUrl: self.redirect + '?cmd=_express-checkout&useraction=commit&token=' + data.TOKEN, 
+			return {
+				redirectUrl: self.redirect + '?cmd=_express-checkout&useraction=commit&token=' + data.TOKEN,
 				token: data.TOKEN,
 				correlationId: data.CORRELATIONID
 			};
@@ -706,7 +730,7 @@ Paypal.prototype.authorizePayment = function(orderDetails) {
 	var self = this;
 	var params = self.setOrderParams(orderDetails);
 
-	
+
 	params.PAYERID = orderDetails.payerId;
 	params.TOKEN = orderDetails.token;
 	params.BUTTONSOURCE = "Volusion_Cart_Mozu_EC";
@@ -714,7 +738,7 @@ Paypal.prototype.authorizePayment = function(orderDetails) {
 	params.METHOD = 'DoExpressCheckoutPayment';
 
 
-	
+
 	console.log("authorize payment",params);
 
 	return self.request(params).then(function(data) {
@@ -723,16 +747,16 @@ Paypal.prototype.authorizePayment = function(orderDetails) {
 };
 
 
-Paypal.prototype.doCapture = function(token,orderNumber, authorizationId, amount, currencyCode ) {
+Paypal.prototype.doCapture = function(token,orderNumber, authorizationId, amount, currencyCode, isPartial ) {
 	var self = this;
 	var params = self.params();
 
-	
+
 	params.AUTHORIZATIONID = authorizationId;
 	params.TOKEN = token;
 	params.AMT = prepareNumber(amount);
-	params.CURRENCYCODE = currencyCode;		
-	params.COMPLETETYPE = "Complete";
+	params.CURRENCYCODE = currencyCode;
+	params.COMPLETETYPE = (isPartial ? "NotComplete" : "Complete");
 	params.INVNUM = orderNumber;
 	params.METHOD = 'DoCapture';
 
@@ -747,14 +771,14 @@ Paypal.prototype.doRefund = function(transactionId, fullRefund, amount,currencyC
 	var self = this;
 	var params = self.params();
 
-	
+
 	params.TRANSACTIONID = transactionId;
 	if (!fullRefund) {
 		params.AMT = prepareNumber(amount);
-		params.CURRENCYCODE = currencyCode;	
-		params.REFUNDTYPE = "Partial";	
+		params.CURRENCYCODE = currencyCode;
+		params.REFUNDTYPE = "Partial";
 	} else
-		params.REFUNDTYPE = "Full";	
+		params.REFUNDTYPE = "Full";
 	params.METHOD = 'RefundTransaction';
 	console.log("Refund details", params);
 
@@ -768,7 +792,7 @@ Paypal.prototype.doVoid = function(authorizationId) {
 	var self = this;
 	var params = self.params();
 
-	
+
 	params.AUTHORIZATIONID = authorizationId;
 	params.METHOD = 'DoVoid';
 
@@ -788,23 +812,23 @@ Paypal.prototype.getItemsParams = function() {
 	// Add product information.
 	for(var i = 0; i < this.products.length; i++) {
 		if (this.products[i].name) {
-			params['L_PAYMENTREQUEST_0_NAME' + i] = this.products[i].name;	
+			params['L_PAYMENTREQUEST_0_NAME' + i] = this.products[i].name;
 		}
 
 		if (this.products[i].description) {
-			params['L_PAYMENTREQUEST_0_DESC' + i] = this.products[i].description;	
+			params['L_PAYMENTREQUEST_0_DESC' + i] = this.products[i].description;
 		}
 
 		if (this.products[i].amount) {
-			params['L_PAYMENTREQUEST_0_AMT' + i] = prepareNumber(this.products[i].amount);	
+			params['L_PAYMENTREQUEST_0_AMT' + i] = prepareNumber(this.products[i].amount);
 		}
 
 		if(this.products[i].quantity) {
-			params['L_PAYMENTREQUEST_0_QTY' + i] = this.products[i].quantity;	
+			params['L_PAYMENTREQUEST_0_QTY' + i] = this.products[i].quantity;
 		}
 
 		/*if(this.products[i].taxAmount) {
-			params['L_PAYMENTREQUEST_0_TAXAMT' + i] = this.products[i].taxAmount;	
+			params['L_PAYMENTREQUEST_0_TAXAMT' + i] = this.products[i].taxAmount;
 		}*/
 
 	}
@@ -815,12 +839,12 @@ Paypal.prototype.getItemsParams = function() {
 
 Paypal.prototype.doExpressCheckoutPayment = function(params) {
 	var self = this;
-	params.METHOD = 'DoExpressCheckoutPayment';	
+	params.METHOD = 'DoExpressCheckoutPayment';
 
 	return self.request(self.url, params);
 
 };
-	
+
 Paypal.prototype.setPayOptions = function(requireShipping, noShipping, allowNote) {
 	this.payOptions = {};
 
@@ -845,9 +869,9 @@ Paypal.prototype.request = function( params) {
 	var self = this;
 	var promise = new Promise(function(resolve, reject) {
 		var encodedParams = querystring.stringify(params);
-		needle.post(self.url, 
+		needle.post(self.url,
 			encodedParams,
-			{json: false, parse: true}, 
+			{json: false, parse: true},
 			function(err, response, body) {
 				if (response.statusCode != 200){
 					console.log("Paypal express Error", response);
@@ -857,7 +881,7 @@ Paypal.prototype.request = function( params) {
 					var data = querystring.parse(body);
 					if (data.ACK !== 'Success') {
 						console.log("Paypal express error", data);
-						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0, 
+						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0,
 							"correlationId" : data.CORRELATIONID, "method" : params.METHOD,
 							"statusMessage": data.L_SHORTMESSAGE0, "errorCode" : data.L_ERRORCODE0});
 					}
@@ -867,7 +891,7 @@ Paypal.prototype.request = function( params) {
 			}
 		);
 	});
-	
+
 
 	return promise;
 };
@@ -877,6 +901,7 @@ exports.Paypal = Paypal;
 exports.create = function(username, password, signature, sandbox) {
 	return new Paypal(username, password, signature, sandbox);
 };
+
 },{"https":undefined,"needle":258,"querystring":277,"underscore":301,"url":303}],7:[function(require,module,exports){
 var asn1 = exports;
 

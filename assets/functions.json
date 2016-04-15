@@ -6,6 +6,11 @@
       "actionId": "embedded.commerce.payments.action.performPaymentInteraction"
     },
     {
+      "id": "paypalPaymentActionBefore",
+      "virtualPath": "./dist\\commerce.payments.manifest.all.js",
+      "actionId": "embedded.commerce.payments.action.before"
+    },
+    {
       "id": "paypalValidator",
       "virtualPath": "./dist\\commerce.settings.manifest.all.js",
       "actionId": "http.commerce.settings.checkout.paymentsettings.updatePaymentSettings.before"

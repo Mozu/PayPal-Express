@@ -28,7 +28,7 @@ function AppInstall(context, callback) {
 
     try {
       console.log("Installing PayPal Express payment settings", tenant);
-      
+
 
       var tasks = tenant.sites.map(
               function(site) {
@@ -43,7 +43,7 @@ function AppInstall(context, callback) {
         self.cb(error);
       });
 
-      
+
     } catch(e) {
       console.error("Paypal install error",e);
       self.cb(e);
@@ -86,13 +86,13 @@ function AppInstall(context, callback) {
       return customRoutesApi.updateCustomRouteSettings(customRoutes);
 
   }
-  
+
 
   function addUpdatePaymentSettings(context, site) {
     console.log("Adding payment settings for site", site.id);
     var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
     paymentSettingsClient.context[constants.headers.SITE] = site.id;
-    //GetExisting 
+    //GetExisting
     var paymentDef = getPaymentDef();
     return paymentSettingsClient.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName :  paymentDef.namespace+"~"+paymentDef.name })
     .then(function(paymentSettings){
@@ -116,19 +116,19 @@ function AppInstall(context, callback) {
     console.log("installing code actions");
     var installer = new ActionInstaller({ context: self.ctx.apiContext });
     installer.enableActions(self.ctx, null, {
-      
+
       "embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 5000;
+        settings.timeoutMilliseconds = 15000;
         return settings;
       },
-      "http.storefront.routes" : function(settings) {
+      "paypalProcessor" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 5000;
+        settings.timeoutMilliseconds = 15000;
         return settings;
       }
 
-    }).then(self.cb.bind(null,null), self.cb);  
+    }).then(self.cb.bind(null,null), self.cb);
   }
 
 
@@ -148,7 +148,7 @@ function AppInstall(context, callback) {
           ]
       };
   }
-  
+
   function getEnvironmentVocabularyValues() {
     return [
       getVocabularyContent("production", "en-US", "Production"),

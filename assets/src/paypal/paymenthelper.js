@@ -30,7 +30,7 @@ module.exports = {
 					enabled: paypalSettings.isEnabled
 				};
 	},
-	
+
 	getPaypalClient: function (config) {
 		return new Paypal.create(config.userName, config.password, config.signature, config.environment === "sandbox");
 	},
@@ -55,7 +55,7 @@ module.exports = {
   			if (result.PAL !== config.merchantId)
   				callback("Paypal Express - MerchantId does not match with value on record.");
   			else
-	  			callback();	
+	  			callback();
   		}, function(e){
   			console.error(e);
   			callback("Paypal Express - User Name/Password/Signatue is invalid");
@@ -120,7 +120,7 @@ module.exports = {
 	    console.log("Payment interaction Type", interactionType);
 
 	    var interaction  =  {status: paymentResult.status, interactionType: interactionType};
-	    if (paymentResult.amount) 
+	    if (paymentResult.amount)
 	      interaction.amount = paymentResult.amount;
 
 	    if (paymentResult.transactionId)
@@ -143,41 +143,57 @@ module.exports = {
   	},
   	authorizePayment: function (context, config, paymentAction, payment) {
   		var self = this;
-		var payerId = payment.billingInfo.data.paypal.payerId;
-		return helper.getOrder(context, payment.orderId, false).then(function(order) {
-			var details = helper.getOrderDetails(order,false, paymentAction);
-			details.token= payment.externalTransactionId;
-			details.payerId= payerId;
+  		return helper.getOrder(context, payment.orderId, false).then(function(order) {
+  			var details = helper.getOrderDetails(order,false, paymentAction);
 
+        var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
 
-			return details;
-		}).then(function(order){
-			console.log(order);
-			var client = self.getPaypalClient(config);
-			if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
-				order.testAmount = context.configuration.paypal.authorization.amount;
+        if (existingPayment) {
+          details.token = existingPayment.externalTransactionId;
+          details.payerId = existingPayment.billingInfo.data.paypal.payerId;
 
-			return client.authorizePayment(order).
-				then(function(result) {
-					return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
-				}, function(err) {
-					return self.getPaymentResult(err, paymentConstants.DECLINED, paymentAction.amount);
-				});	
-		}).then(function(authResult) {
-			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT)
-				return authResult;
-			//Capture payment
-			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+          var existingAuth = _.find(existingPayment.interactions, function(interaction)  { return interaction.interactionType === "Authorization" && interaction.status === paymentConstants.AUTHORIZED && interaction.gatewayResponseCode=== "200";});
+          details.existingAuth = existingAuth;
+        } else {
+          details.token= payment.externalTransactionId;
+          details.payerId =  payment.billingInfo.data.paypal.payerId;
+        }
+  			return details;
+  		}).then(function(order){
+  			console.log(order);
+  			var client = self.getPaypalClient(config);
+  			if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
+  				order.testAmount = context.configuration.paypal.authorization.amount;
 
-			return self.captureAmount(context, config, paymentAction, payment)
-					.then(function(captureResult) {
-						captureResult.captureOnAuthorize = true;
-						return captureResult;
-					});
-		}).catch(function(err) {
-			console.error("Authorize error",err);
-			return self.getPaymentResult({statusText: err}, paymentConstants.FAILED, paymentAction.amount);
-		});
+        if (order.existingAuth) {
+          console.log("Using existing authorization", order.existingAuth);
+          //var response = order.existingAuth.gatewayResponseText.split(" - ");
+          var response = self.getPaymentResult({status: "Success",transactionId: order.existingAuth.gatewayTransactionId, ack: "success" }, paymentConstants.AUTHORIZED, paymentAction.amount);
+          response.responseText = order.existingAuth.gatewayResponseText;
+          return response;
+        }
+
+  			return client.authorizePayment(order).
+  				then(function(result) {
+  					return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
+  				}, function(err) {
+  					return self.getPaymentResult(err, paymentConstants.DECLINED, paymentAction.amount);
+  				});
+  		}).then(function(authResult) {
+  			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT)
+  				return authResult;
+  			//Capture payment
+  			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+
+  			return self.captureAmount(context, config, paymentAction, payment)
+  					.then(function(captureResult) {
+  						captureResult.captureOnAuthorize = true;
+  						return captureResult;
+  					});
+  		}).catch(function(err) {
+  			console.error("Authorize error",err);
+  			return self.getPaymentResult({statusText: err}, paymentConstants.FAILED, paymentAction.amount);
+  		});
 	},
 	captureAmount: function (context, config, paymentAction, payment) {
   		var self = this;
@@ -204,18 +220,18 @@ module.exports = {
 		      return response;
 		    }
 		    var client = self.getPaypalClient(config);
-
+        var isPartial =  true;
 		    if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 				paymentAction.amount = context.configuration.paypal.capture.amount;
 
 		    return client.doCapture(payment.externalTransactionId,order.orderNumber,
-		    								paymentAuthorizationInteraction.gatewayTransactionId, 
-		    								paymentAction.amount, paymentAction.currencyCode)
+		    								paymentAuthorizationInteraction.gatewayTransactionId,
+		    								paymentAction.amount, paymentAction.currencyCode, isPartial)
 		    	.then(function(captureResult){
 		         	return self.getPaymentResult(captureResult,paymentConstants.CAPTURED, paymentAction.amount);
 		    	}, function(err) {
 		    		return self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount);
-		    	});	
+		    	});
 		}).catch(function(err) {
 			console.error("Capture Error ",err);
 			return self.getPaymentResult({statusText: err}, paymentConstants.DECLINED, paymentAction.amount);
@@ -229,14 +245,14 @@ module.exports = {
 	      console.log("AWS Refund, previous capturedInteraction", capturedInteraction);
 	      if (!capturedInteraction) {
 	        return {status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment has not been captured to issue refund"};
-	      } 
+	      }
 
 	      if (paymentAction.manualGatewayInteraction) {
 	        console.log("Manual credit...dont send to Paypal");
 	        return {amount: paymentAction.amount,gatewayResponseCode:  "OK", status: paymentConstants.CREDITED,
 	                transactionId: paymentAction.manualGatewayInteraction.gatewayInteractionId};
 	      }
-	      
+
 	      var fullRefund = paymentAction.amount === capturedInteraction.amount;
 	      var client = self.getPaypalClient(config);
 
@@ -251,7 +267,7 @@ module.exports = {
 	        return self.getPaymentResult(err, paymentConstants.FAILED, paymentAction.amount);
 	      });
 		//});
-		
+
 		//return promise;
 	},
 	voidPayment: function(context,config, paymentAction, payment) {
@@ -267,10 +283,10 @@ module.exports = {
 			console.log("Void Payment - Captured interaction", capturedInteraction);
 			if (capturedInteraction) {
 			  return {status : paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Payment with captures cannot be voided. Please issue a refund"};
-			} 
+			}
 
 			var authorizedInteraction = self.getInteractionByStatus(payment.interactions,paymentConstants.AUTHORIZED);
-			if (!authorizedInteraction) 
+			if (!authorizedInteraction)
 			  return {status: paymentConstants.VOIDED, amount: paymentAction.amount};
 			var client = self.getPaypalClient(config);
 
@@ -283,7 +299,7 @@ module.exports = {
 				},
 				function(err) {
 					console.error("Void Payment", err);
-					return self.getPaymentResult(result,paymentConstants.FAILED, paymentAction.amount );	
+					return self.getPaymentResult(result,paymentConstants.FAILED, paymentAction.amount );
 				}
 			);
 

@@ -37,7 +37,7 @@ var helper = module.exports = {
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
-		return (queryString.PayerID !== "" && 
+		return (queryString.PayerID !== "" &&
 			queryString.token !== "" && queryString.id !== ""  );
 	},
 	getPaymentFQN: function(context) {
@@ -60,6 +60,7 @@ var helper = module.exports = {
 		delete params.isCart;
 		delete params.PayerID;
 		delete params.paypalCheckout;
+    delete params.ppErrorId;
 		var queryString = "";
 		Object.keys(params).forEach(function(key){
 			if (queryString !== "")
@@ -95,8 +96,8 @@ var helper = module.exports = {
     	var self = this;
 		var items=	_.map(order.items, function(item) {
 			return 	{
-				name: item.product.name, 
-				quantity: item.quantity, 
+				name: item.product.name,
+				quantity: item.quantity,
 				amount: item.discountedTotal/item.quantity,
 				lineId: item.lineId//,
 				//taxAmount: item.itemTaxTotal
@@ -109,7 +110,7 @@ var helper = module.exports = {
 
 
 		/*if (order.shippingDiscounts) {
-			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));	
+			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));
 		}*/
 
 		if (order.handlingDiscount) {
@@ -134,11 +135,14 @@ var helper = module.exports = {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal,
-			handlingAmount: order.handlingTotal+order.dutyTotal,
+			handlingAmount: order.handlingTotal,
 			shippingAmount: order.shippingTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
-		}; 
+		};
+
+    if (order.dutyTotal)
+      orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
@@ -151,7 +155,7 @@ var helper = module.exports = {
 			orderDetails.currencyCode = order.currencyCode;
 		}
 
-		if (includeShipping) 
+		if (includeShipping)
 			orderDetails.email = order.email;
 
 		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
@@ -173,6 +177,6 @@ var helper = module.exports = {
 		if (isCart)
 			return Cart.getCart({cartId: id});
 		else
-			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});	
+			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});
 	}
 };

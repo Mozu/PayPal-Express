@@ -4,6 +4,7 @@ module.exports = {
       actionName: 'http.storefront.pages.cart.request.after',
       customFunction: require('./domains/storefront/paypalCartAfter')
   },
+  
   'paypalCheckoutAfter': {
       actionName: 'http.storefront.pages.checkout.request.after',
       customFunction: require('./domains/storefront/paypalCheckoutAfter')

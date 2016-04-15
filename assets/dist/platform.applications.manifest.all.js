@@ -29,7 +29,7 @@ function AppInstall(context, callback) {
 
     try {
       console.log("Installing PayPal Express payment settings", tenant);
-      
+
 
       var tasks = tenant.sites.map(
               function(site) {
@@ -44,7 +44,7 @@ function AppInstall(context, callback) {
         self.cb(error);
       });
 
-      
+
     } catch(e) {
       console.error("Paypal install error",e);
       self.cb(e);
@@ -87,13 +87,13 @@ function AppInstall(context, callback) {
       return customRoutesApi.updateCustomRouteSettings(customRoutes);
 
   }
-  
+
 
   function addUpdatePaymentSettings(context, site) {
     console.log("Adding payment settings for site", site.id);
     var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
     paymentSettingsClient.context[constants.headers.SITE] = site.id;
-    //GetExisting 
+    //GetExisting
     var paymentDef = getPaymentDef();
     return paymentSettingsClient.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName :  paymentDef.namespace+"~"+paymentDef.name })
     .then(function(paymentSettings){
@@ -117,19 +117,19 @@ function AppInstall(context, callback) {
     console.log("installing code actions");
     var installer = new ActionInstaller({ context: self.ctx.apiContext });
     installer.enableActions(self.ctx, null, {
-      
+
       "embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 5000;
+        settings.timeoutMilliseconds = 15000;
         return settings;
       },
-      "http.storefront.routes" : function(settings) {
+      "paypalProcessor" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 5000;
+        settings.timeoutMilliseconds = 15000;
         return settings;
       }
 
-    }).then(self.cb.bind(null,null), self.cb);  
+    }).then(self.cb.bind(null,null), self.cb);
   }
 
 
@@ -149,7 +149,7 @@ function AppInstall(context, callback) {
           ]
       };
   }
-  
+
   function getEnvironmentVocabularyValues() {
     return [
       getVocabularyContent("production", "en-US", "Production"),
@@ -217,6 +217,7 @@ module.exports = function(context, callback) {
       callback(e);
     }
 };
+
 },{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":9,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":42,"mozu-node-sdk/clients/commerce/settings/general/customRouteSettings":43,"mozu-node-sdk/constants":45,"underscore":69}],2:[function(require,module,exports){
 module.exports = {
 	PAYMENTSETTINGID : "PayPalExpress2",
@@ -277,7 +278,7 @@ var helper = module.exports = {
 	},
 	isPayPalCheckout: function(context) {
 		var queryString = this.parseUrl(context);
-		return (queryString.PayerID !== "" && 
+		return (queryString.PayerID !== "" &&
 			queryString.token !== "" && queryString.id !== ""  );
 	},
 	getPaymentFQN: function(context) {
@@ -300,6 +301,7 @@ var helper = module.exports = {
 		delete params.isCart;
 		delete params.PayerID;
 		delete params.paypalCheckout;
+    delete params.ppErrorId;
 		var queryString = "";
 		Object.keys(params).forEach(function(key){
 			if (queryString !== "")
@@ -335,8 +337,8 @@ var helper = module.exports = {
     	var self = this;
 		var items=	_.map(order.items, function(item) {
 			return 	{
-				name: item.product.name, 
-				quantity: item.quantity, 
+				name: item.product.name,
+				quantity: item.quantity,
 				amount: item.discountedTotal/item.quantity,
 				lineId: item.lineId//,
 				//taxAmount: item.itemTaxTotal
@@ -349,7 +351,7 @@ var helper = module.exports = {
 
 
 		/*if (order.shippingDiscounts) {
-			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));	
+			items = _.union(items, getActiveDiscountItems(order.shippingDiscounts));
 		}*/
 
 		if (order.handlingDiscount) {
@@ -374,11 +376,14 @@ var helper = module.exports = {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal,
-			handlingAmount: order.handlingTotal+order.dutyTotal,
+			handlingAmount: order.handlingTotal,
 			shippingAmount: order.shippingTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
-		}; 
+		};
+
+    if (order.dutyTotal)
+      orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
@@ -391,7 +396,7 @@ var helper = module.exports = {
 			orderDetails.currencyCode = order.currencyCode;
 		}
 
-		if (includeShipping) 
+		if (includeShipping)
 			orderDetails.email = order.email;
 
 		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
@@ -413,18 +418,17 @@ var helper = module.exports = {
 		if (isCart)
 			return Cart.getCart({cartId: id});
 		else
-			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});	
+			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});
 	}
 };
 
 },{"./constants":2,"mozu-action-helpers/get-app-info":8,"mozu-node-sdk/clients/commerce/cart":40,"mozu-node-sdk/clients/commerce/order":41,"mozu-node-sdk/constants":45,"querystring":68,"underscore":69,"url":74}],4:[function(require,module,exports){
 module.exports = {
   
-    'paypalInstall': {
+  'paypalInstall': {
       actionName: 'embedded.platform.applications.install',
       customFunction: require('./domains/platform.applications/paypalInstall')
-  	}
-
+  }
 };
 
 },{"./domains/platform.applications/paypalInstall":1}],5:[function(require,module,exports){

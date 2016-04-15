@@ -1,8 +1,7 @@
 module.exports = {
   
-    'paypalInstall': {
+  'paypalInstall': {
       actionName: 'embedded.platform.applications.install',
       customFunction: require('./domains/platform.applications/paypalInstall')
-  	}
-
+  }
 };
