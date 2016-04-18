@@ -71,7 +71,7 @@ module.exports = function(context, callback) {
  * Call `response.end()` to end the response early.
  * Call `response.set(headerName)` to set an HTTP header for the response.
  * `request.headers` is an object containing the HTTP headers for the request.
- * 
+ *
  * The `request` and `response` objects are both Streams and you can read
  * data out of them the way that you would in Node.
 
@@ -103,7 +103,7 @@ module.exports = function(context, callback) {
 		var errorRedirectUrl = (isCart ? "/cart" : "/checkout/"+queryString.id);
 
 		if (!isPaypalCheckout) return callback();
-		//self.checkUserSession(context);
+		self.checkUserSession(context);
 		console.log("Processing paypal checkout");
 		paypal.process(context, queryString, isCart).then(function(data){
 			var queryStringParams = helper.parseUrl(context);
@@ -121,6 +121,7 @@ module.exports = function(context, callback) {
 		setError(err,context, errorRedirectUrl);
 	}
 };
+
 },{"../../paypal/checkout":5,"../../paypal/helper":7,"easy-guid":74}],4:[function(require,module,exports){
 /**
  * Implementation for http.storefront.routes
