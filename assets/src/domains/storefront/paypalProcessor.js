@@ -47,7 +47,7 @@ module.exports = function(context, callback) {
 		var errorRedirectUrl = (isCart ? "/cart" : "/checkout/"+queryString.id);
 
 		if (!isPaypalCheckout) return callback();
-		self.checkUserSession(context);
+		paypal.checkUserSession(context);
 		console.log("Processing paypal checkout");
 		paypal.process(context, queryString, isCart).then(function(data){
 			var queryStringParams = helper.parseUrl(context);

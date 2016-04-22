@@ -328,15 +328,24 @@ var paypalCheckout = module.exports = {
 				var message = paypalError;
 				if (paypalError.statusText)
 					message = paypalError.statusText;
+        else if (paypalError.originalError) {
+          console.log("originalError", paypalError.originalError);
+          if (paypalError.originalError.items.length > 0)
+            message = paypalError.originalError.items[0].message;
+          else
+           message = paypalError.originalError.message;
+         }
 				else if (paypalError.message){
 					message = paypalError.message;
 					if (message.errorMessage)
 						message = message.errorMessage;
+
 				}
 				else if (paypalError.errorMessage)
 					message = paypalError.errorMessage;
 
-				context.response.viewData.paypalError = paypalError;
+        console.log("Error Message", message);
+				context.response.viewData.model.messages = [{'message' : message}];
 			}
 		}
 		callback();
