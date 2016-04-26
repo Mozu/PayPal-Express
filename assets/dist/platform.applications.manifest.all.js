@@ -126,6 +126,7 @@ function AppInstall(context, callback) {
       "paypalProcessor" : function(settings) {
         settings = settings || {};
         settings.timeoutMilliseconds = 15000;
+        settings.configuration = {"addBillingInfo" : false};
         return settings;
       }
 

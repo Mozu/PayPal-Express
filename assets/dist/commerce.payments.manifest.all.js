@@ -222,10 +222,29 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 }
 
 
-function setPayment(context, order, token, payerId, email) {
+function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo) {
 
 	if (order.amountRemainingForPayment < 0) return order;
 	var registeredShopper = getUserEmail(context);
+
+  var billingContact = {"email" : registeredShopper || paypalOrder.EMAIL};
+
+  if (addBillingInfo && paypalOrder.BILLINGNAME) {
+    var billToName = paypalOrder.BILLINGNAME.split(/\s+/g);
+      billingContact.firstName  = billToName[0];
+      billingContact.lastNameOrSurname = billToName[1];
+      billingContact.phoneNumbers = {"home" : "N/A"};
+      billingContact.address= {
+            "address1": paypalOrder.STREET,
+            "cityOrTown": paypalOrder.CITY,
+            "stateOrProvince": paypalOrder.STATE,
+            "postalOrZipCode": paypalOrder.ZIP,
+            "countryCode": paypalOrder.COUNTRY,
+            "addressType": 'Residential',
+            "isValidated": paypalOrder.ADDRESSSTATUS === "Confirmed" ? true : false
+        };
+  }
+
 	console.log("Setting payment..amount amountRemainingForPayment", order.amountRemainingForPayment);
 	var billingInfo =  {
 		"amount" : order.amountRemainingForPayment,
@@ -235,9 +254,7 @@ function setPayment(context, order, token, payerId, email) {
 	        "paymentType": paymentConstants.PAYMENTSETTINGID,
 	        "paymentWorkflow": paymentConstants.PAYMENTSETTINGID,
 	        "card" : null,
-	        "billingContact" : {
-	            "email": registeredShopper || email
-	        },
+	        "billingContact" : billingContact,
           "externalTransactionId" : token,
 	        "isSameBillingShippingAddress" : false,
 	         "data" : {
@@ -364,7 +381,7 @@ var paypalCheckout = module.exports = {
 
 		if (!id || !payerId || !token)
 			throw new Error("id or payerId or token is missing");
-
+    var addBillingInfo = (context.configuration && context.configuration && context.configuration.addBillingInfo ? context.configuration.addBillingInfo : false);
 		return paymentHelper.getPaymentConfig(context).then(function(config){
 			return config;
 		}).then(function(config) {
@@ -392,7 +409,7 @@ var paypalCheckout = module.exports = {
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
 
-			return client.getExpressCheckoutDetails(token).
+			return client.getExpressCheckoutDetails(token, addBillingInfo).
 			then(function(paypalOrder) {
 				console.log("paypal order", paypalOrder);
 				response.paypalOrder = paypalOrder;
@@ -419,7 +436,7 @@ var paypalCheckout = module.exports = {
 			return voidExistingOrderPayments(response, context);
 		}).then(function(response) {
 			//Set new payment to PayPal express
-			return setPayment(context, response.order, token, payerId, response.paypalOrder.EMAIL);
+			return setPayment(context, response.order, token, payerId, response.paypalOrder,addBillingInfo);
 		});
 	},
 	processPayment: function(context, callback) {
@@ -1132,12 +1149,13 @@ Paypal.prototype.setOrderParams = function(order) {
 	return params;
 };
 
-Paypal.prototype.getExpressCheckoutDetails = function(token) {
+Paypal.prototype.getExpressCheckoutDetails = function(token, requiresBillingAddress) {
 	var self = this;
 	var params = self.params();
 
 	params.TOKEN = token;
 	params.METHOD = 'GetExpressCheckoutDetails';
+  params.REQBILLINGADDRESS = (requiresBillingAddress ? 1 : 0);
 	console.log(params);
 
 	return self.request(params);

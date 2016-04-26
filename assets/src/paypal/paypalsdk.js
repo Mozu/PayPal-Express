@@ -112,12 +112,13 @@ Paypal.prototype.setOrderParams = function(order) {
 	return params;
 };
 
-Paypal.prototype.getExpressCheckoutDetails = function(token) {
+Paypal.prototype.getExpressCheckoutDetails = function(token, requiresBillingAddress) {
 	var self = this;
 	var params = self.params();
 
 	params.TOKEN = token;
 	params.METHOD = 'GetExpressCheckoutDetails';
+  params.REQBILLINGADDRESS = (requiresBillingAddress ? 1 : 0);
 	console.log(params);
 
 	return self.request(params);
