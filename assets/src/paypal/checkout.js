@@ -2,6 +2,7 @@ var _ = require("underscore");
 var constants = require("mozu-node-sdk/constants");
 var paymentConstants = require("./constants");
 var Order = require("mozu-node-sdk/clients/commerce/order");
+var Cart = require("mozu-node-sdk/clients/commerce/cart")
 var FulfillmentInfo = require('mozu-node-sdk/clients/commerce/orders/fulfillmentInfo');
 var OrderPayment = require('mozu-node-sdk/clients/commerce/orders/payment');
 var OrderShipment =  require('mozu-node-sdk/clients/commerce/orders/shipment');
@@ -35,7 +36,14 @@ function voidExistingOrderPayments(data, context) {
 function convertCartToOrder(context, id, isCart) {
 	if (isCart) {
 		console.log("Converting cart to order");
-		return helper.createClientFromContext(Order, context).createOrderFromCart({ cartId: id  });
+    console.log(context);
+    var cartClient = helper.createClientFromContext(Cart, context);
+    var orderClient = helper.createClientFromContext(Order, context);
+
+		return cartClient.getOrCreateCart().then(
+      function(cart){
+       return orderClient.createOrderFromCart({ cartId: cart.id  });
+    });
 	}
 	else {
 		console.log("Getting existing order");
@@ -50,7 +58,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 	var fulfillmentInfo = {
 		"fulfillmentContact" : {
         "firstName" : shipToName[0],
-        "lastNameOrSurname" : shipToName[1],
+        "lastNameOrSurname" : (shipToName[1] ? shipToName[1] : context.configruation.missingLastNameValue),
         "email" : paypalOrder.EMAIL,
         "phoneNumbers" : {
           "home" : paypalOrder.SHIPTOPHONENUM || "N/A"
@@ -162,10 +170,15 @@ function getUserEmail(context) {
 
 var paypalCheckout = module.exports = {
 	checkUserSession: function(context) {
+
 		var user = context.items.pageContext.user;
 		if ( !user.isAnonymous && !user.IsAuthenticated )
 		{
-		  context.response.redirect('/user/login?returnUrl=' + encodeURIComponent(context.request.url));
+      var allowWarmCheckout = (context.configuration && context.configuration.allowWarmCheckout);
+      var redirectUrl = '/user/login?returnUrl=' + encodeURIComponent(context.request.url);
+      if (!allowWarmCheckout)
+        redirectUrl = '/logout?returnUrl=' + encodeURIComponent(context.request.url)+"&saveUserId=true";
+		  context.response.redirect(redirectUrl);
 		  return context.response.end();
 		}
 	},
@@ -231,9 +244,10 @@ var paypalCheckout = module.exports = {
 
 		if (!id || !payerId || !token)
 			throw new Error("id or payerId or token is missing");
-    var addBillingInfo = (context.configuration && context.configuration && context.configuration.addBillingInfo ? context.configuration.addBillingInfo : false);
+    var addBillingInfo = (context.configuration && context.configuration.addBillingInfo ? context.configuration.addBillingInfo : false);
 		return paymentHelper.getPaymentConfig(context).then(function(config){
 			return config;
+
 		}).then(function(config) {
 			//convert card to order or get existing order
 			return convertCartToOrder(context, id, isCart).then(
@@ -347,7 +361,7 @@ var paypalCheckout = module.exports = {
 					message = paypalError.statusText;
         else if (paypalError.originalError) {
           console.log("originalError", paypalError.originalError);
-          if (paypalError.originalError.items.length > 0)
+          if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
             message = paypalError.originalError.items[0].message;
           else
            message = paypalError.originalError.message;
@@ -361,7 +375,6 @@ var paypalCheckout = module.exports = {
 				else if (paypalError.errorMessage)
 					message = paypalError.errorMessage;
 
-        console.log("Error Message", message);
 				context.response.viewData.model.messages = [{'message' : message}];
 			}
 		}

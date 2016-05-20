@@ -120,13 +120,18 @@ function AppInstall(context, callback) {
 
       "embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 15000;
+        settings.timeoutMilliseconds = 30000;
         return settings;
       },
       "paypalProcessor" : function(settings) {
         settings = settings || {};
+        settings.timeoutMilliseconds = 30000;
+        settings.configuration = {"addBillingInfo" : false, "missingLastNameValue" : "N/A", "allowWarmCheckout" : true};
+        return settings;
+      },
+      "paypalToken" : function(settings) {
+        settings = settings || {};
         settings.timeoutMilliseconds = 15000;
-        settings.configuration = {"addBillingInfo" : false};
         return settings;
       }
 
@@ -303,6 +308,7 @@ var helper = module.exports = {
 		delete params.PayerID;
 		delete params.paypalCheckout;
     delete params.ppErrorId;
+    delete params.startpaypalcheckout;
 		var queryString = "";
 		Object.keys(params).forEach(function(key){
 			if (queryString !== "")

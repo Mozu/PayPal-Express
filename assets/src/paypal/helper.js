@@ -61,6 +61,7 @@ var helper = module.exports = {
 		delete params.PayerID;
 		delete params.paypalCheckout;
     delete params.ppErrorId;
+    delete params.startpaypalcheckout;
 		var queryString = "";
 		Object.keys(params).forEach(function(key){
 			if (queryString !== "")
