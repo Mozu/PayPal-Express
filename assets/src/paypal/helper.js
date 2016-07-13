@@ -172,6 +172,14 @@ var helper = module.exports = {
 				phone: order.fulfillmentInfo.fulfillmentContact.phoneNumbers.home
 			};
 		}
+
+    orderDetails.requiresShipping = true;
+    //check if shipping is required
+    var shipItems = _.findWhere(order.items, function(item) { return items.fulfillmentMethod === "ship"; });
+    if (!shipItems)
+      orderDetails.requiresShipping = false;
+
+
 		return orderDetails;
 	},
 	getOrder: function(context, id, isCart) {

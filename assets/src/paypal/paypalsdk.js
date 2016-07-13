@@ -129,23 +129,6 @@ Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUr
 
 
 	var params = self.setOrderParams(order);
-	/*params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
-	//params.PAYMENTREQUEST_0_DESC = description;
-	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
-
-	if (order.taxAmount)
-		params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
-	if (order.handlingAmount)
-		params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(order.handlingAmount);
-	if (order.shippingAmount)
-		params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
-	//params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(odder.amount);
-
-	if (order.items) {
-		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(orderDetails.items, function(sum, item) {return sum+item.amount;},0));
-		self.setProducts(order.items);
-		params = _.extend(params, this.getItemsParams());
-	}*/
 
 
 	params.PAYMENTREQUEST_0_PAYMENTACTION = 'Authorization';

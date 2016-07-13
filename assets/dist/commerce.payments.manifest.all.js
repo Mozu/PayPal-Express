@@ -152,7 +152,7 @@ var _ = require("underscore");
 var constants = require("mozu-node-sdk/constants");
 var paymentConstants = require("./constants");
 var Order = require("mozu-node-sdk/clients/commerce/order");
-var Cart = require("mozu-node-sdk/clients/commerce/cart")
+var Cart = require("mozu-node-sdk/clients/commerce/cart");
 var FulfillmentInfo = require('mozu-node-sdk/clients/commerce/orders/fulfillmentInfo');
 var OrderPayment = require('mozu-node-sdk/clients/commerce/orders/payment');
 var OrderShipment =  require('mozu-node-sdk/clients/commerce/orders/shipment');
@@ -203,12 +203,18 @@ function convertCartToOrder(context, id, isCart) {
 
 function setFulfillmentInfo(context, id, paypalOrder) {
 	console.log("ship to name",paypalOrder.SHIPTONAME);
-	var shipToName = paypalOrder.SHIPTONAME.split(/\s+/g);
-	console.log("shiptoname",shipToName);
+	var parts = paypalOrder.SHIPTONAME.split(/\s+/);
+	console.log("shiptoname",parts);
+
+  var firstName = parts[0];
+  var lastName = context.configuration.missingLastNameValue;
+  if (parts[1])
+    lastName = paypalOrder.SHIPTONAME.replace(parts[0]+" ","").replace(parts[0],"");
+
 	var fulfillmentInfo = {
 		"fulfillmentContact" : {
-        "firstName" : shipToName[0],
-        "lastNameOrSurname" : (shipToName[1] ? shipToName[1] : context.configruation.missingLastNameValue),
+        "firstName" : firstName,
+        "lastNameOrSurname" : lastName,
         "email" : paypalOrder.EMAIL,
         "phoneNumbers" : {
           "home" : paypalOrder.SHIPTOPHONENUM || "N/A"
@@ -238,9 +244,11 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo) 
   var billingContact = {"email" : registeredShopper || paypalOrder.EMAIL};
 
   if (addBillingInfo && paypalOrder.BILLINGNAME) {
-    var billToName = paypalOrder.BILLINGNAME.split(/\s+/g);
-      billingContact.firstName  = billToName[0];
-      billingContact.lastNameOrSurname = billToName[1];
+    var parts = paypalOrder.BILLINGNAME.split(/\s+/g);
+
+      billingContact.firstName  = parts[0];
+      billingContact.lastNameOrSurname = paypalOrder.BILLINGNAME.replace(parts[0]+" ","").replace(parts[0],"");
+
       billingContact.phoneNumbers = {"home" : "N/A"};
       billingContact.address= {
             "address1": paypalOrder.STREET,
@@ -727,6 +735,14 @@ var helper = module.exports = {
 				phone: order.fulfillmentInfo.fulfillmentContact.phoneNumbers.home
 			};
 		}
+
+    orderDetails.requiresShipping = true;
+    //check if shipping is required
+    var shipItems = _.findWhere(order.items, function(item) { return items.fulfillmentMethod === "ship"; });
+    if (!shipItems)
+      orderDetails.requiresShipping = false;
+
+
 		return orderDetails;
 	},
 	getOrder: function(context, id, isCart) {
@@ -1180,23 +1196,6 @@ Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUr
 
 
 	var params = self.setOrderParams(order);
-	/*params.PAYMENTREQUEST_0_AMT = prepareNumber(order.amount);
-	//params.PAYMENTREQUEST_0_DESC = description;
-	params.PAYMENTREQUEST_0_CURRENCYCODE = order.currencyCode;
-
-	if (order.taxAmount)
-		params.PAYMENTREQUEST_0_TAXAMT = prepareNumber(order.taxAmount);
-	if (order.handlingAmount)
-		params.PAYMENTREQUEST_0_HANDLINGAMT = prepareNumber(order.handlingAmount);
-	if (order.shippingAmount)
-		params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
-	//params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(odder.amount);
-
-	if (order.items) {
-		params.PAYMENTREQUEST_0_ITEMAMT = prepareNumber(_.reduce(orderDetails.items, function(sum, item) {return sum+item.amount;},0));
-		self.setProducts(order.items);
-		params = _.extend(params, this.getItemsParams());
-	}*/
 
 
 	params.PAYMENTREQUEST_0_PAYMENTACTION = 'Authorization';
