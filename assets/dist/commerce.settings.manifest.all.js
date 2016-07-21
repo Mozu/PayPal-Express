@@ -433,8 +433,9 @@ module.exports = {
   					return self.getPaymentResult(err, paymentConstants.DECLINED, paymentAction.amount);
   				});
   		}).then(function(authResult) {
-  			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT)
+  			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT || authResult.status == paymentConstants.DECLINED || authResult.status == paymentConstants.FAILED)
   				return authResult;
+
   			//Capture payment
   			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
 

@@ -122,6 +122,11 @@ function AppInstall(context, callback) {
         settings.timeoutMilliseconds = 30000;
         return settings;
       },
+      "paypalPaymentActionBefore" : function(settings) {
+        settings = settings || {};
+        settings.timeoutMilliseconds = 30000;
+        return settings;
+      },
       "paypalProcessor" : function(settings) {
         settings = settings || {};
         settings.timeoutMilliseconds = 30000;
