@@ -228,6 +228,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 	console.log("ship to name",paypalOrder.SHIPTONAME);
 	var parts = paypalOrder.SHIPTONAME.split(/\s+/);
 	console.log("shiptoname",parts);
+  var registeredShopper = getUserEmail(context);
 
   var firstName = parts[0];
   var lastName = context.configuration.missingLastNameValue;
@@ -238,7 +239,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 		"fulfillmentContact" : {
         "firstName" : firstName,
         "lastNameOrSurname" : lastName,
-        "email" : paypalOrder.EMAIL,
+        "email" : registeredShopper || paypalOrder.EMAIL,
         "phoneNumbers" : {
           "home" : paypalOrder.SHIPTOPHONENUM || "N/A"
         },
@@ -271,7 +272,6 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo) 
 
       billingContact.firstName  = parts[0];
       billingContact.lastNameOrSurname = paypalOrder.BILLINGNAME.replace(parts[0]+" ","").replace(parts[0],"");
-
       billingContact.phoneNumbers = {"home" : "N/A"};
       billingContact.address= {
             "address1": paypalOrder.STREET,
@@ -926,6 +926,15 @@ module.exports = {
   			var details = helper.getOrderDetails(order,false, paymentAction);
 
         var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
+        var existingAuthorized = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized";   });
+
+        if (existingAuthorized) {
+          details.token = existingAuthorized.externalTransactionId;
+          details.payerId = existingAuthorized.billingInfo.data.paypal.payerId;
+          details.existingAuth = existingAuthorized;
+          details.processingFailed = true;
+          return details;
+        }
 
         if (existingPayment) {
           details.token = existingPayment.externalTransactionId;
@@ -949,6 +958,7 @@ module.exports = {
           //var response = order.existingAuth.gatewayResponseText.split(" - ");
           var response = self.getPaymentResult({status: "Success",transactionId: order.existingAuth.gatewayTransactionId, ack: "success" }, paymentConstants.AUTHORIZED, paymentAction.amount);
           response.responseText = order.existingAuth.gatewayResponseText;
+          response.processingFailed = order.processingFailed;
           return response;
         }
 
@@ -962,8 +972,10 @@ module.exports = {
   			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT || authResult.status == paymentConstants.DECLINED || authResult.status == paymentConstants.FAILED)
   				return authResult;
 
-  			//Capture payment
-  			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+        if (!authResult.processingFailed) {
+    			//Capture payment
+    			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+        }
 
   			return self.captureAmount(context, config, paymentAction, payment)
   					.then(function(captureResult) {
@@ -1391,7 +1403,7 @@ Paypal.prototype.request = function( params) {
 		var encodedParams = querystring.stringify(params);
 		needle.post(self.url,
 			encodedParams,
-			{json: false, parse: true},
+			{json: false, parse: true,open_timeout: 60000},
 			function(err, response, body) {
 				if (response.statusCode != 200){
 					console.log("Paypal express Error", response);

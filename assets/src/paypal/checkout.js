@@ -55,6 +55,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 	console.log("ship to name",paypalOrder.SHIPTONAME);
 	var parts = paypalOrder.SHIPTONAME.split(/\s+/);
 	console.log("shiptoname",parts);
+  var registeredShopper = getUserEmail(context);
 
   var firstName = parts[0];
   var lastName = context.configuration.missingLastNameValue;
@@ -65,7 +66,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
 		"fulfillmentContact" : {
         "firstName" : firstName,
         "lastNameOrSurname" : lastName,
-        "email" : paypalOrder.EMAIL,
+        "email" : registeredShopper || paypalOrder.EMAIL,
         "phoneNumbers" : {
           "home" : paypalOrder.SHIPTOPHONENUM || "N/A"
         },
@@ -98,7 +99,6 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo) 
 
       billingContact.firstName  = parts[0];
       billingContact.lastNameOrSurname = paypalOrder.BILLINGNAME.replace(parts[0]+" ","").replace(parts[0],"");
-
       billingContact.phoneNumbers = {"home" : "N/A"};
       billingContact.address= {
             "address1": paypalOrder.STREET,
