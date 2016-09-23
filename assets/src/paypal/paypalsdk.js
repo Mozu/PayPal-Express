@@ -300,7 +300,7 @@ Paypal.prototype.request = function( params) {
 		var encodedParams = querystring.stringify(params);
 		needle.post(self.url,
 			encodedParams,
-			{json: false, parse: true},
+			{json: false, parse: true,open_timeout: 60000},
 			function(err, response, body) {
 				if (response.statusCode != 200){
 					console.log("Paypal express Error", response);

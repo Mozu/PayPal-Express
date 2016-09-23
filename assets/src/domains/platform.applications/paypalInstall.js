@@ -119,23 +119,23 @@ function AppInstall(context, callback) {
 
       "embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 30000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 30000;
         return settings;
       },
       "paypalPaymentActionBefore" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 30000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 30000;
         return settings;
       },
       "paypalProcessor" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 30000;
-        settings.configuration = {"addBillingInfo" : false, "missingLastNameValue" : "N/A", "allowWarmCheckout" : true};
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 30000;
+        settings.configuration = settings.configuration || {"addBillingInfo" : false, "missingLastNameValue" : "N/A", "allowWarmCheckout" : true};
         return settings;
       },
       "paypalToken" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = 15000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 15000;
         return settings;
       }
 

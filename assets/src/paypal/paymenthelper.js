@@ -147,6 +147,15 @@ module.exports = {
   			var details = helper.getOrderDetails(order,false, paymentAction);
 
         var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
+        var existingAuthorized = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized";   });
+
+        if (existingAuthorized) {
+          details.token = existingAuthorized.externalTransactionId;
+          details.payerId = existingAuthorized.billingInfo.data.paypal.payerId;
+          details.existingAuth = existingAuthorized;
+          details.processingFailed = true;
+          return details;
+        }
 
         if (existingPayment) {
           details.token = existingPayment.externalTransactionId;
@@ -170,6 +179,7 @@ module.exports = {
           //var response = order.existingAuth.gatewayResponseText.split(" - ");
           var response = self.getPaymentResult({status: "Success",transactionId: order.existingAuth.gatewayTransactionId, ack: "success" }, paymentConstants.AUTHORIZED, paymentAction.amount);
           response.responseText = order.existingAuth.gatewayResponseText;
+          response.processingFailed = order.processingFailed;
           return response;
         }
 
@@ -183,8 +193,10 @@ module.exports = {
   			if (config.processingOption === paymentConstants.CAPTUREONSHIPMENT || authResult.status == paymentConstants.DECLINED || authResult.status == paymentConstants.FAILED)
   				return authResult;
 
-  			//Capture payment
-  			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+        if (!authResult.processingFailed) {
+    			//Capture payment
+    			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+        }
 
   			return self.captureAmount(context, config, paymentAction, payment)
   					.then(function(captureResult) {
