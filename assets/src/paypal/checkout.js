@@ -68,7 +68,7 @@ function setFulfillmentInfo(context, id, paypalOrder) {
         "lastNameOrSurname" : lastName,
         "email" : registeredShopper || paypalOrder.EMAIL,
         "phoneNumbers" : {
-          "home" : paypalOrder.SHIPTOPHONENUM || "N/A"
+          "home" : paypalOrder.SHIPTOPHONENUM || (paypalOrder.PHONENUM || "N/A")
         },
         "address" : {
           "address1" : paypalOrder.SHIPTOSTREET,
@@ -99,7 +99,7 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo) 
 
       billingContact.firstName  = parts[0];
       billingContact.lastNameOrSurname = paypalOrder.BILLINGNAME.replace(parts[0]+" ","").replace(parts[0],"");
-      billingContact.phoneNumbers = {"home" : "N/A"};
+      billingContact.phoneNumbers = {"home" : paypalOrder.PHONENUM || "N/A"};
       billingContact.address= {
             "address1": paypalOrder.STREET,
             "cityOrTown": paypalOrder.CITY,

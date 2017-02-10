@@ -99,7 +99,7 @@ var helper = module.exports = {
 			return 	{
 				name: item.product.name,
 				quantity: item.quantity,
-				amount: item.discountedTotal/item.quantity,
+				amount: parseFloat(item.discountedTotal/item.quantity).toFixed(2),
 				lineId: item.lineId//,
 				//taxAmount: item.itemTaxTotal
 			};
