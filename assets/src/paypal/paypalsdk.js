@@ -155,14 +155,14 @@ Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUr
 };
 
 
-Paypal.prototype.authorizePayment = function(orderDetails) {
+Paypal.prototype.authorizePayment = function(orderDetails, config) {
 	var self = this;
 	var params = self.setOrderParams(orderDetails);
 
 
 	params.PAYERID = orderDetails.payerId;
 	params.TOKEN = orderDetails.token;
-	params.BUTTONSOURCE = "Volusion_Cart_Mozu_EC";
+	params.BUTTONSOURCE = config.buttonSource;
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
 
