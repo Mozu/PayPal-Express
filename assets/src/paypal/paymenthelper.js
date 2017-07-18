@@ -182,8 +182,8 @@ module.exports = {
           response.processingFailed = order.processingFailed;
           return response;
         }
-
-  			return client.authorizePayment(order).
+				var secureData =  context.getSecureAppData('paypalConfig');
+  			return client.authorizePayment(order, secureData).
   				then(function(result) {
   					return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
   				}, function(err) {

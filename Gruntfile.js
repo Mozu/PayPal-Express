@@ -1,4 +1,5 @@
 module.exports = function (grunt) {
+    require('process').env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
     'use strict';
     grunt.loadTasks('./tasks');
     require('time-grunt')(grunt);
