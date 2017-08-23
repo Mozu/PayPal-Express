@@ -6,6 +6,7 @@ var paymentConstants = require("./constants");
 var _ = require("underscore");
 var constants = require("mozu-node-sdk/constants");
 var Order = require("mozu-node-sdk/clients/commerce/order");
+var Checkout = require("mozu-node-sdk/clients/commerce/checkout");
 var Cart = require("mozu-node-sdk/clients/commerce/cart")();
 
 var helper = module.exports = {
@@ -135,15 +136,15 @@ var helper = module.exports = {
 	getOrderDetails: function(order, includeShipping, paymentAction) {
 		var self = this;
 		var orderDetails = {
-			taxAmount: order.taxTotal,
+			taxAmount: order.taxTotal || (((order.itemTaxTotal + order.shippingTaxTotal + order.handlingTaxTotal+0.00001) * 100) / 100),
 			handlingAmount: order.handlingTotal,
-			shippingAmount: order.shippingTotal,
+			shippingAmount: order.shippingSubTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
 		};
 
-    if (order.dutyTotal)
-      orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
+    	if (order.dutyTotal)
+      		orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
@@ -182,10 +183,13 @@ var helper = module.exports = {
 
 		return orderDetails;
 	},
-	getOrder: function(context, id, isCart) {
+	getOrder: function(context, id, isCart, isMultiship) {
+		console.log("isMultiShip", isMultiship);
 		if (isCart)
 			return Cart.getCart({cartId: id});
-		else
+		else if (!isMultiship)
 			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});
+		else
+			return this.createClientFromContext(Checkout, context, true).getCheckout({checkoutId: id});
 	}
 };
