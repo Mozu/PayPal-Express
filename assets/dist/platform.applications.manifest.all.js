@@ -229,7 +229,7 @@ module.exports = function(context, callback) {
     }
 };
 
-},{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":13,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":19,"mozu-node-sdk/clients/commerce/settings/general/customRouteSettings":20,"mozu-node-sdk/constants":23,"underscore":70}],2:[function(require,module,exports){
+},{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":13,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":47,"mozu-node-sdk/clients/commerce/settings/general/customRouteSettings":48,"mozu-node-sdk/constants":51,"underscore":37}],2:[function(require,module,exports){
 module.exports = {
 	PAYMENTSETTINGID : "PayPalExpress2",
 	ENVIRONMENT: "environment",
@@ -258,6 +258,7 @@ var paymentConstants = require("./constants");
 var _ = require("underscore");
 var constants = require("mozu-node-sdk/constants");
 var Order = require("mozu-node-sdk/clients/commerce/order");
+var Checkout = require("mozu-node-sdk/clients/commerce/checkout");
 var Cart = require("mozu-node-sdk/clients/commerce/cart")();
 
 var helper = module.exports = {
@@ -389,13 +390,13 @@ var helper = module.exports = {
 		var orderDetails = {
 			taxAmount: order.taxTotal,
 			handlingAmount: order.handlingTotal,
-			shippingAmount: order.shippingTotal,
+			shippingAmount: order.shippingSubTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
 		};
 
-    if (order.dutyTotal)
-      orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
+    	if (order.dutyTotal)
+      		orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
@@ -434,15 +435,18 @@ var helper = module.exports = {
 
 		return orderDetails;
 	},
-	getOrder: function(context, id, isCart) {
+	getOrder: function(context, id, isCart, isMultiship) {
+		console.log("isMultiShip", isMultiship);
 		if (isCart)
 			return Cart.getCart({cartId: id});
-		else
+		else if (!isMultiship)
 			return this.createClientFromContext(Order, context, true).getOrder({orderId: id});
+		else
+			return this.createClientFromContext(Checkout, context, true).getCheckout({checkoutId: id});
 	}
 };
 
-},{"./constants":2,"mozu-action-helpers/get-app-info":12,"mozu-node-sdk/clients/commerce/cart":17,"mozu-node-sdk/clients/commerce/order":18,"mozu-node-sdk/constants":23,"querystring":53,"underscore":70,"url":74}],4:[function(require,module,exports){
+},{"./constants":2,"mozu-action-helpers/get-app-info":12,"mozu-node-sdk/clients/commerce/cart":44,"mozu-node-sdk/clients/commerce/checkout":45,"mozu-node-sdk/clients/commerce/order":46,"mozu-node-sdk/constants":51,"querystring":20,"underscore":37,"url":38}],4:[function(require,module,exports){
 module.exports = {
   
   'paypalInstall': {
@@ -812,7 +816,7 @@ var objectKeys = Object.keys || function (obj) {
   return keys;
 };
 
-},{"util/":78}],6:[function(require,module,exports){
+},{"util/":42}],6:[function(require,module,exports){
 
 },{}],7:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
@@ -1431,7 +1435,7 @@ ActionInstaller.prototype.save = function(enabledActions) {
   return this.client.updateExtensions(enabledActions);
 };
 
-},{"../endash":11,"mozu-node-sdk/clients/platform/tenantExtensions":22}],14:[function(require,module,exports){
+},{"../endash":11,"mozu-node-sdk/clients/platform/tenantExtensions":50}],14:[function(require,module,exports){
 /**
  * This is a pretty naive implementation for now,
  * but since AppDev validates this pretty stringently,
@@ -1447,1311 +1451,6 @@ module.exports = function(key) {
   };
 }
 },{}],15:[function(require,module,exports){
-module.exports={
-  "Production/Sandbox": {
-    "homeDomain": "https://home.mozu.com",
-    "paymentServiceTenantPodDomain": "https://pmts.mozu.com",
-    "paymentServiceSandboxDomain": "https://payments-sb.mozu.com"
-  },
-  "Staging": {
-    "homeDomain": "https://home.staging.mozu.com",
-    "paymentServiceTenantPodDomain": "http://services.staging-hp.prod.mozu.com",
-    "paymentServiceSandboxDomain": "http://services.staging-hp.prod.mozu.com"
-  },
-  "QA": {
-    "homeDomain": "https://home.mozu-qa.com",
-    "paymentServiceTenantPodDomain": "https://payments-qa.dev.volusion.com",
-    "paymentServiceSandboxDomain": "https://services-sandbox-mozu-qa.dev.volusion.com"
-  },
-  "SI": {
-    "homeDomain": "https://home.mozu-si.com",
-    "paymentServiceTenantPodDomain": "https://payments.mozu-si.com",
-    "paymentServiceSandboxDomain": "https://payments.mozu-si.com"
-  },
-  "CI": {
-    "homeDomain": "http://aus02ncrprx001.dev.volusion.com",
-    "paymentServiceTenantPodDomain": "http://AUS02NCSERV001.dev.volusion.com",
-    "paymentServiceSandboxDomain": "http://AUS02NCSERV001.dev.volusion.com"
-  }
-}
-
-},{}],16:[function(require,module,exports){
-'use strict';
-
-var extend = require('./utils/tiny-extend'),
-    _sub = require('./utils/sub'),
-    constants = require('./constants'),
-    makeMethod = require('./utils/make-method'),
-    getConfig = require('./utils/get-config'),
-    normalizeContext = require('./utils/normalize-context'),
-    inMemoryAuthCache = require('./plugins/in-memory-auth-cache'),
-    serverSidePrerequisites = require('./plugins/server-side-prerequisites'),
-    expandUriTemplateFromContext = require('./plugins/expand-uritemplate-from-context'),
-    versionKey = constants.headers.VERSION,
-    version = constants.version;
-
-var NodeDefaultPlugins = {
-  authenticationStorage: inMemoryAuthCache,
-  prerequisiteTasks: serverSidePrerequisites,
-  urlResolver: expandUriTemplateFromContext
-};
-
-function applyDefaultPlugins(client, plugins) {
-  Object.keys(plugins).forEach(function (n) {
-    return client[n] = plugins[n](client);
-  });
-}
-
-function makeClient(clientCls) {
-  return function (cfg) {
-    return new clientCls(extend({}, this, cfg));
-  };
-}
-
-function cloneContext(ctx) {
-  var newCtx;
-  if (!ctx) return {};
-  try {
-    newCtx = JSON.parse(JSON.stringify(ctx));
-  } catch (e) {
-    throw new Error('Could not serialize context when creating Client. ' + 'Do not assign non-serializable objects to the client.context.');
-  }
-  newCtx[versionKey] = newCtx[versionKey] || version;
-  return newCtx;
-}
-
-function isContextSufficient(context) {
-  return context && context.baseUrl;
-}
-
-function Client(cfg) {
-  cfg = cfg || {};
-  var context = normalizeContext(cfg.apiContext || cfg.context || {});
-  if (!isContextSufficient(context)) {
-    context = context ? extend(getConfig(), context) : getConfig();
-  }
-  this.context = cloneContext(context);
-  this.defaultRequestOptions = extend({}, Client.defaultRequestOptions, cfg.defaultRequestOptions);
-  // apply the right default plugin config for a server-side environment
-  // (that is, Node, ArcJS, or perhaps Rhino/Nashorn/WinJS)
-  if (typeof process !== "undefined") {
-    applyDefaultPlugins(this, NodeDefaultPlugins);
-  }
-  if (cfg.plugins) {
-    // override plugins if necessary
-    this.plugins = cfg.plugins.slice();
-    this.plugins.forEach(function (p) {
-      p(this);
-    }.bind(this));
-  }
-}
-
-// statics
-extend(Client, {
-  defaultRequestOptions: {},
-  method: makeMethod,
-  sub: function sub(methods) {
-    return makeClient(_sub(Client, methods));
-  },
-  constants: constants
-});
-
-module.exports = Client;
-},{"./constants":23,"./plugins/expand-uritemplate-from-context":24,"./plugins/in-memory-auth-cache":25,"./plugins/server-side-prerequisites":31,"./utils/get-config":35,"./utils/make-method":37,"./utils/normalize-context":38,"./utils/sub":42,"./utils/tiny-extend":44}],17:[function(require,module,exports){
-
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by CodeZu.     
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-var Client = require('../../client'), constants = Client.constants;
-
-module.exports = Client.sub({
-	getCart: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/carts/{cartId}?responseFields={responseFields}'
-	}),
-	getOrCreateCart: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/carts/current?responseFields={responseFields}'
-	}),
-	getCartSummary: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/carts/summary?responseFields={responseFields}'
-	}),
-	getUserCartSummary: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/carts/user/{userId}/summary?responseFields={responseFields}'
-	}),
-	getUserCart: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/carts/user/{userId}?responseFields={responseFields}'
-	}),
-	updateCart: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/carts/current?responseFields={responseFields}'
-	}),
-	deleteCart: Client.method({
-		method: constants.verbs.DELETE,
-		url: '{+tenantPod}api/commerce/carts/{cartId}'
-	}),
-	deleteCurrentCart: Client.method({
-		method: constants.verbs.DELETE,
-		url: '{+tenantPod}api/commerce/carts/current'
-	})
-});
-
-},{"../../client":16}],18:[function(require,module,exports){
-
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by CodeZu.     
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-var Client = require('../../client'), constants = Client.constants;
-
-module.exports = Client.sub({
-	getOrders: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/orders/?startIndex={startIndex}&pageSize={pageSize}&sortBy={sortBy}&filter={filter}&q={q}&qLimit={qLimit}&responseFields={responseFields}'
-	}),
-	getAvailableActions: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/actions'
-	}),
-	getTaxableOrders: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/taxableorders'
-	}),
-	getOrder: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/orders/{orderId}?draft={draft}&responseFields={responseFields}'
-	}),
-	createOrderFromCart: Client.method({
-		method: constants.verbs.POST,
-		url: '{+tenantPod}api/commerce/orders/?cartId={cartId}&responseFields={responseFields}'
-	}),
-	createOrder: Client.method({
-		method: constants.verbs.POST,
-		url: '{+tenantPod}api/commerce/orders/?responseFields={responseFields}'
-	}),
-	performOrderAction: Client.method({
-		method: constants.verbs.POST,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/actions?responseFields={responseFields}'
-	}),
-	processDigitalWallet: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/digitalWallet/{digitalWalletType}?responseFields={responseFields}'
-	}),
-	updateOrderDiscount: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/discounts/{discountId}?updatemode={updateMode}&version={version}&responseFields={responseFields}'
-	}),
-	deleteOrderDraft: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/draft?version={version}'
-	}),
-	resendOrderConfirmationEmail: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/email/resend'
-	}),
-	changeOrderPriceList: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/priceList?updatemode={updateMode}&version={version}&responseFields={responseFields}'
-	}),
-	changeOrderUserId: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}/users?responseFields={responseFields}'
-	}),
-	updateOrder: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/orders/{orderId}?updatemode={updateMode}&version={version}&responseFields={responseFields}'
-	})
-});
-
-},{"../../client":16}],19:[function(require,module,exports){
-
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by CodeZu.     
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-var Client = require('../../../../client'), constants = Client.constants;
-
-module.exports = Client.sub({
-	getThirdPartyPaymentWorkflowWithValues: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflow/{fullyQualifiedName}?responseFields={responseFields}'
-	}),
-	getThirdPartyPaymentWorkflows: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflows'
-	}),
-	addThirdPartyPaymentWorkflow: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflows'
-	}),
-	deleteThirdPartyPaymentWorkflow: Client.method({
-		method: constants.verbs.DELETE,
-		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflows/{fullyQualifiedName}'
-	})
-});
-
-},{"../../../../client":16}],20:[function(require,module,exports){
-
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by CodeZu.     
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-var Client = require('../../../../client'), constants = Client.constants;
-
-module.exports = Client.sub({
-	getCustomRouteSettings: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
-	}),
-	createCustomRouteSettings: Client.method({
-		method: constants.verbs.POST,
-		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
-	}),
-	updateCustomRouteSettings: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
-	}),
-	deleteCustomRouteSettings: Client.method({
-		method: constants.verbs.DELETE,
-		url: '{+tenantPod}api/commerce/settings/general/customroutes'
-	})
-});
-
-},{"../../../../client":16}],21:[function(require,module,exports){
-
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by CodeZu.     
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-var Client = require('../../client'), constants = Client.constants;
-
-module.exports = Client.sub({
-	getTenant: Client.method({
-		method: constants.verbs.GET,
-		url: '{+homePod}api/platform/tenants/{tenantId}?responseFields={responseFields}'
-	})
-});
-
-},{"../../client":16}],22:[function(require,module,exports){
-
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by CodeZu.     
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-var Client = require('../../client'), constants = Client.constants;
-
-module.exports = Client.sub({
-	getExtensions: Client.method({
-		method: constants.verbs.GET,
-		url: '{+tenantPod}api/platform/extensions/?responseFields={responseFields}'
-	}),
-	updateExtensions: Client.method({
-		method: constants.verbs.PUT,
-		url: '{+tenantPod}api/platform/extensions/?responseFields={responseFields}'
-	})
-});
-
-},{"../../client":16}],23:[function(require,module,exports){
-'use strict';
-
-var version = require('./version'),
-    DEVELOPER = 1,
-    ADMINUSER = 2,
-    SHOPPER = 4,
-    TENANT = 8,
-    SITE = 16,
-    MASTERCATALOG = 32,
-    CATALOG = 64,
-    APP_ONLY = 128,
-    NONE = 256,
-    APP_REQUIRED = 512;
-
-// scopes are not yet in use, but when the services can reflect
-// their required scope, here will be all the bitmask constants
-
-// some contexts are always additive
-
-TENANT |= ADMINUSER;
-SITE |= TENANT;
-MASTERCATALOG |= TENANT;
-CATALOG |= MASTERCATALOG;
-SHOPPER |= SITE | CATALOG;
-
-module.exports = {
-  scopes: {
-    APP_REQUIRED: APP_REQUIRED,
-    DEVELOPER: DEVELOPER,
-    ADMINUSER: ADMINUSER,
-    SHOPPER: SHOPPER,
-    TENANT: TENANT,
-    SITE: SITE,
-    MASTERCATALOG: MASTERCATALOG,
-    CATALOG: CATALOG,
-    APP_ONLY: APP_ONLY,
-    NONE: NONE
-  },
-  verbs: {
-    GET: 'GET',
-    POST: 'POST',
-    PUT: 'PUT',
-    DELETE: 'DELETE'
-  },
-  headerPrefix: 'x-vol-',
-  headers: {
-    APPCLAIMS: 'app-claims',
-    USERCLAIMS: 'user-claims',
-    TENANT: 'tenant',
-    SITE: 'site',
-    MASTERCATALOG: 'master-catalog',
-    CATALOG: 'catalog',
-    DATAVIEWMODE: 'dataview-mode',
-    VERSION: 'version',
-    SHA256: 'hmac-sha256'
-  },
-  dataViewModes: {
-    LIVE: 'Live',
-    PENDING: 'Pending'
-  },
-  capabilityTimeoutInSeconds: 180,
-  version: version.current
-};
-},{"./version":46}],24:[function(require,module,exports){
-'use strict';
-
-var getUrlTemplate = require('../utils/get-url-template');
-var extend = require('../utils/tiny-extend');
-
-function ensureTrailingSlash(url) {
-  return url.charAt(url.length - 1) === '/' ? url : url + '/';
-}
-
-/**
- * Creates, evaluates based on context, and returns a string URL for a Mozu API request.
- * @param  {Object} context The context of a client. Should have a `baseUrl` property at minimum.
- * @param  {string} tpt     A string to be compiled into a UriTemplate. Should be a valid UriTemplate.
- * @param  {Object} body      An object consisting of the JSON body of the request, to be used to interpolate URL paramters.
- * @return {string}         A fully qualified URL.
- */
-module.exports = function () {
-  return function (client, tpt, body) {
-    var context = client.context;
-    var template = getUrlTemplate(tpt);
-    var fullTptEvalCtx = extend(
-    // aliases for pod URLs and IDs first
-    {
-      homePod: context.baseUrl,
-      pciPod: context.basePciUrl,
-      tenantId: context.tenant,
-      siteId: context.site,
-      catalogId: context.catalog,
-      masterCatalogId: context['master-catalog']
-    },
-    // all context values override those base values if provided
-    context,
-    // any matching values in the body override last.
-    body);
-
-    // ensure all base URLs have trailing slashes.
-    ['homePod', 'pciPod', 'tenantPod'].forEach(function (x) {
-      if (fullTptEvalCtx[x]) fullTptEvalCtx[x] = ensureTrailingSlash(fullTptEvalCtx[x]);
-    });
-
-    // don't pass the API version!
-    if (!body || !body.hasOwnProperty("version")) delete fullTptEvalCtx.version;
-
-    return template.render(fullTptEvalCtx);
-  };
-};
-},{"../utils/get-url-template":36,"../utils/tiny-extend":44}],25:[function(require,module,exports){
-'use strict';
-
-var assert = require('assert');
-
-function isExpired(ticket) {
-  var ungraceperiod = 60000;
-  var compareDate = new Date();
-  compareDate.setTime(compareDate.getTime() + ungraceperiod);
-  return new Date(ticket.refreshTokenExpiration) < compareDate;
-}
-
-function generateCacheKey(claimtype, context) {
-  var cmps;
-  if (!process.env.mozuHosted) {
-    assert(context.appKey, "No application key in context!");
-    cmps = [context.appKey];
-  } else {
-    cmps = ['mozuHosted'];
-  }
-  switch (claimtype) {
-    case "developer":
-      assert(context.developerAccount && context.developerAccount.emailAddress, "No developer account email address in context!");
-      cmps.push(context.developerAccount.emailAddress, context.developerAccountId);
-      break;
-    case "admin-user":
-      assert(context.tenant, "No tenant in context!");
-      assert(context.adminUser && context.adminUser.emailAddress, "No admin user email address in context!");
-      cmps.push(context.tenant, context.adminUser.emailAddress);
-      break;
-    default:
-      break;
-  }
-  return cmps.join();
-}
-
-module.exports = function InMemoryAuthCache() {
-  var claimsCaches = {
-    application: {},
-    developer: {},
-    'admin-user': {}
-  };
-
-  return {
-    get: function get(claimtype, context, callback) {
-      var ticket = claimsCaches[claimtype][generateCacheKey(claimtype, context)];
-      setImmediate(function () {
-        callback(null, ticket && !isExpired(ticket) && ticket || undefined);
-      });
-    },
-    set: function set(claimtype, context, ticket, callback) {
-      claimsCaches[claimtype][generateCacheKey(claimtype, context)] = ticket;
-      setImmediate(callback);
-    },
-    constructor: InMemoryAuthCache
-  };
-};
-},{"assert":5}],26:[function(require,module,exports){
-'use strict';
-
-var AuthProvider = require('../../security/auth-provider');
-var scopes = require('../../constants').scopes;
-var getScopeFromState = require('./get-scope-from-state');
-
-/**
- * If necessary, add application claims to a client context before
- * placing a request. Relies on a `scope` parameter to specify.
- * Uses AuthProvider.
- */
-
-module.exports = function (state) {
-  var client = state.client;
-
-  var scope = getScopeFromState(state);
-
-  if (scope & scopes.APP_REQUIRED || !(scope & scopes.NONE || scope & scopes.DEVELOPER)) {
-    return AuthProvider.addPlatformAppClaims(client).then(function () {
-      return state;
-    });
-  } else {
-    return state;
-  }
-};
-},{"../../constants":23,"../../security/auth-provider":32,"./get-scope-from-state":30}],27:[function(require,module,exports){
-'use strict';
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-var TenantCache = require('../../utils/tenant-cache');
-var EnvUrls = require('mozu-metadata/data/environments.json');
-var getUrlTemplate = require('../../utils/get-url-template');
-var getScopeFromState = require('./get-scope-from-state');
-
-/**
- * If necessary, transforms a promise for a prepared client into a promise
- * for a client that has a `basePciUrl` in its context.
- * Reads from the TenantCache if necessary, and consumes mozu-metadata.
- */
-
-var PCIUrlsByBaseUrl = Object.keys(EnvUrls).reduce(function (o, c) {
-  o[EnvUrls[c].homeDomain] = EnvUrls[c];
-  return o;
-}, {});
-
-module.exports = function (state) {
-  var client = state.client;
-  var requestConfig = state.requestConfig;
-  var url = requestConfig.url;
-
-  if (~getUrlTemplate(url).keysUsed.indexOf('pciPod') && !client.context.basePciUrl && !client.context.pciPod) {
-    var _ret = function () {
-      var tenantId = client.context.tenantId || client.context.tenant;
-      var pciUrls = PCIUrlsByBaseUrl[client.context.baseUrl];
-      if (!tenantId) {
-        throw new Error('Could not place request to ' + url + ' because it requires a tenant ' + 'ID to be set in the client context.');
-      } else if (!pciUrls) {
-        throw new Error('Could not place request to ' + url + ' because it is making a call to ' + 'Payment Service, but there is no known payment service domain ' + ('matching the environment whose base URL is ' + client.context.baseUrl + '.'));
-      } else {
-        return {
-          v: TenantCache.get(tenantId, client, getScopeFromState(state)).then(function (t) {
-            if (t.isDevTenant) {
-              client.context.basePciUrl = pciUrls.paymentServiceSandboxDomain;
-            } else {
-              client.context.basePciUrl = pciUrls.paymentServiceTenantPodDomain;
-            }
-            return state;
-          })
-        };
-      }
-    }();
-
-    if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
-  } else {
-    return state;
-  }
-};
-},{"../../utils/get-url-template":36,"../../utils/tenant-cache":43,"./get-scope-from-state":30,"mozu-metadata/data/environments.json":15}],28:[function(require,module,exports){
-'use strict';
-
-var TenantCache = require('../../utils/tenant-cache');
-var getUrlTemplate = require('../../utils/get-url-template');
-var getScopeFromState = require('./get-scope-from-state');
-
-/**
- * If necessary, transforms a promise for a prepared client into a promise
- * for a client that has a `tenantPod` in its context.
- * Reads from the TenantCache if necessary.
- */
-
-module.exports = function (state) {
-  var client = state.client;
-  var requestConfig = state.requestConfig;
-  var url = requestConfig.url;
-
-  if (~getUrlTemplate(url).keysUsed.indexOf('tenantPod') && !client.context.tenantPod) {
-    var tenantId = client.context.tenantId || client.context.tenant;
-    if (!tenantId) {
-      throw new Error('Could not place request to ' + url + ' because it requires a tenant ' + 'ID to be set in the client context.');
-    } else {
-      return TenantCache.get(tenantId, client, getScopeFromState(state)).then(function (tenant) {
-        client.context.tenantPod = 'https://' + tenant.domain + '/';
-        return state;
-      });
-    }
-  } else {
-    return state;
-  }
-};
-},{"../../utils/get-url-template":36,"../../utils/tenant-cache":43,"./get-scope-from-state":30}],29:[function(require,module,exports){
-'use strict';
-
-var AuthProvider = require('../../security/auth-provider');
-var scopes = require('../../constants').scopes;
-var getScopeFromState = require('./get-scope-from-state');
-
-/**
- * If necessary, add developer user claims to a client context before
- * placing a request. Relies on a `scope` parameter to specify.
- * Uses AuthProvider.
- */
-
-module.exports = function (state) {
-  var client = state.client;
-  var scope = getScopeFromState(state);
-
-  if (scope & scopes.DEVELOPER) {
-    return AuthProvider.addDeveloperUserClaims(client).then(function () {
-      return state;
-    });
-  } else if (scope & scopes.ADMINUSER) {
-    return AuthProvider.addAdminUserClaims(client).then(function () {
-      return state;
-    });
-  } else if (!scope && AuthProvider.addMostRecentUserClaims) {
-    return AuthProvider.addMostRecentUserClaims(client).then(function () {
-      return state;
-    });
-  } else {
-    return state;
-  }
-};
-},{"../../constants":23,"../../security/auth-provider":32,"./get-scope-from-state":30}],30:[function(require,module,exports){
-'use strict';
-
-var scopes = require('../../constants').scopes;
-
-/**
- * From a given prerequisite state object (config, options, requestConfig)
- * return scope.
- */
-
-module.exports = function (state) {
-  var requestConfig = state.requestConfig;
-  var options = state.options;
-
-  if (options && options.scope) {
-    if (scopes[options.scope]) {
-      return scopes[options.scope];
-    } else {
-      return options.scope;
-    }
-  } else {
-    return requestConfig.scope;
-  }
-};
-},{"../../constants":23}],31:[function(require,module,exports){
-'use strict';
-/**
- * Sensible default configuration for a NodeJS, ArcJS, or other server env.
- * Includes assumptions that you'll have access to Tenant Service, etc.
- * Not appropriate for shopper or storefront use.
- */
-
-module.exports = function () {
-  return [require('./ensure-tenant-pod-url'), require('./ensure-pci-pod-url'), require('./ensure-user-claims'), require('./ensure-app-claims')];
-};
-},{"./ensure-app-claims":26,"./ensure-pci-pod-url":27,"./ensure-tenant-pod-url":28,"./ensure-user-claims":29}],32:[function(require,module,exports){
-/* eslint handle-callback-err: 0 */
-/* global Promise */
-'use strict';
-
-var constants = require('../constants'),
-    AuthTicket = require('./auth-ticket'),
-    scopes = constants.scopes;
-
-var TenantCache = require('../utils/tenant-cache');
-
-// if (typeof Promise !== "function") require('when/es6-shim/Promise.browserify-es6');
-
-function createMemoizedClientFactory(clientPath) {
-  var c;
-  return function () {
-    return (c || (c = require(clientPath))).apply(this, arguments);
-  };
-}
-
-var makeAppAuthClient = createMemoizedClientFactory('../clients/platform/applications/authTicket');
-var makeDeveloperAuthClient = createMemoizedClientFactory('../clients/platform/developer/developerAdminUserAuthTicket');
-var makeAdminUserAuthClient = createMemoizedClientFactory('../clients/platform/adminuser/tenantAdminUserAuthTicket');
-
-function cacheDataAndCreateAuthTicket(res) {
-  var tenants = res.availableTenants;
-  if (tenants) {
-    for (var i = 0; i < tenants.length; i++) {
-      TenantCache.add(tenants[i]);
-    }
-  }
-  return new AuthTicket(res);
-}
-
-function getPlatformAuthTicket(client) {
-  return makeAppAuthClient(client).authenticateApp({
-    applicationId: client.context.appKey,
-    sharedSecret: client.context.sharedSecret
-  }, {
-    scope: scopes.NONE
-  }).then(cacheDataAndCreateAuthTicket);
-}
-
-function refreshPlatformAuthTicket(client, ticket) {
-  return makeAppAuthClient(client).refreshAppAuthTicket({
-    refreshToken: ticket.refreshToken
-  }, {
-    scope: scopes.NONE
-  }).then(cacheDataAndCreateAuthTicket);
-}
-
-function getDeveloperAuthTicket(client) {
-  return makeDeveloperAuthClient(client).createDeveloperUserAuthTicket(client.context.developerAccount, {
-    scope: scopes.NONE
-  }).then(cacheDataAndCreateAuthTicket);
-}
-
-function refreshDeveloperAuthTicket(client, ticket) {
-  return makeDeveloperAuthClient(client).refreshDeveloperAuthTicket(ticket, {
-    scope: scopes.NONE
-  }).then(cacheDataAndCreateAuthTicket);
-}
-
-function getAdminUserAuthTicket(client) {
-  return makeAdminUserAuthClient(client).createUserAuthTicket({ tenantId: client.context.tenant }, {
-    body: client.context.adminUser,
-    scope: constants.scopes.APP_ONLY
-  }).then(function (json) {
-    client.context.user = json.user;
-    return cacheDataAndCreateAuthTicket(json);
-  });
-}
-
-function refreshAdminUserAuthTicket(client, ticket) {
-  return makeAdminUserAuthClient(client).refreshAuthTicket(ticket, {
-    scope: constants.scopes.APP_ONLY
-  }).then(cacheDataAndCreateAuthTicket);
-}
-
-var calleeToClaimType = {
-  'addPlatformAppClaims': 'application',
-  'addDeveloperUserClaims': 'developer',
-  'addAdminUserClaims': 'admin-user'
-};
-
-function makeClaimMemoizer(calleeName, requester, refresher, claimHeader) {
-  return function (client) {
-    var cacheAndUpdateClient = function cacheAndUpdateClient(ticket) {
-      return new Promise(function (resolve) {
-        client.authenticationStorage.set(calleeToClaimType[calleeName], client.context, ticket, function () {
-          client.context[claimHeader] = ticket.accessToken;
-          resolve(client);
-        });
-      });
-    };
-    var op = new Promise(function (resolve) {
-      client.authenticationStorage.get(calleeToClaimType[calleeName], client.context, function (err, ticket) {
-        resolve(ticket);
-      });
-    }).then(function (ticket) {
-      if (!ticket) {
-        return requester(client).then(cacheAndUpdateClient);
-      }
-      if (new Date(ticket.accessTokenExpiration) < new Date()) {
-        return refresher(client, ticket).then(cacheAndUpdateClient);
-      }
-      client.context[claimHeader] = ticket.accessToken;
-      return client;
-    });
-    function setRecent() {
-      AuthProvider.addMostRecentUserClaims = AuthProvider[calleeName];
-    }
-    op.then(setRecent, setRecent);
-    return op;
-  };
-}
-
-var AuthProvider = {
-
-  addPlatformAppClaims: makeClaimMemoizer('addPlatformAppClaims', getPlatformAuthTicket, refreshPlatformAuthTicket, constants.headers.APPCLAIMS),
-  addDeveloperUserClaims: makeClaimMemoizer('addDeveloperUserClaims', getDeveloperAuthTicket, refreshDeveloperAuthTicket, constants.headers.USERCLAIMS),
-  addAdminUserClaims: makeClaimMemoizer('addAdminUserClaims', getAdminUserAuthTicket, refreshAdminUserAuthTicket, constants.headers.USERCLAIMS),
-  addMostRecentUserClaims: false
-};
-
-module.exports = AuthProvider;
-},{"../constants":23,"../utils/tenant-cache":43,"./auth-ticket":33}],33:[function(require,module,exports){
-'use strict';
-
-/**
- * The authentication ticket used to authenticate anything.
- * @class AuthTicket
- * @property {string} accessToken The token that stores an encrypted list of the application's configured behaviors and authenticates the application.
- * @property {Date} accessTokenExpiration Date and time the access token expires. After the access token expires, refresh the authentication ticket using the refresh token.
- * @property {string} refreshToken The token that refreshes the application's authentication ticket.
- * @property {Date} refreshTokenExpiration Date and time the refresh token expires. After the refresh token expires, generate a new authentication ticket.
- */
-
-function AuthTicket(json) {
-  var self = this;
-  if (!(this instanceof AuthTicket)) return new AuthTicket(json);
-  for (var p in json) {
-    if (json.hasOwnProperty(p)) {
-      self[p] = p.indexOf('Expiration') !== -1 ? new Date(json[p]) : json[p]; // dateify the dates, this'll break if the prop name changes
-    }
-  }
-}
-
-module.exports = AuthTicket;
-},{}],34:[function(require,module,exports){
-'use strict';
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-var extend = require('./tiny-extend');
-var util = require('util');
-module.exports = function errorify(res, additions) {
-  try {
-    if (typeof res === "string") {
-      return new Error(res);
-    }
-    var err;
-    var message = ensureMessage(res);
-    var stringBody = ensureString(res.body);
-    var details = _typeof(res.body) === "object" ? res.body : (typeof res === 'undefined' ? 'undefined' : _typeof(res)) === "object" ? res : {};
-
-    if (!message && stringBody) {
-      try {
-        details = JSON.parse(stringBody);
-        message = details.message || stringBody;
-      } catch (e) {
-        message = stringBody;
-      }
-    }
-
-    if (additions) {
-      extend(details, additions);
-    }
-
-    message = (message || "Unknown error!") + formatDetails(details);
-
-    err = new Error(message);
-    err.originalError = details;
-    return err;
-  } catch (e) {
-    return e;
-  }
-};
-
-function formatDetails(deets) {
-  return "\n\nDetails:\n" + Object.keys(deets).map(function (label) {
-    var deet = deets[label];
-    if ((typeof deet === 'undefined' ? 'undefined' : _typeof(deet)) === "object") deet = util.inspect(deet);
-    return " " + label + ": " + deet;
-  }).join('\n') + '\n';
-}
-
-function ensureString(something) {
-  if (!something) return String(something);
-  if (typeof something === "string") {
-    return something;
-  }
-  if (Buffer.isBuffer(something)) {
-    return something.toString('utf-8');
-  }
-  if (typeof something.toString === "function") {
-    return something.toString();
-  }
-  return String(something);
-}
-
-function ensureMessage(res) {
-  return res.message || res.body && res.body.message;
-}
-},{"./tiny-extend":44,"util":78}],35:[function(require,module,exports){
-'use strict';
-// BEGIN INIT
-
-var fs = require('fs');
-var findup = require('./tiny-findup');
-
-var legalConfigNames = ['mozu.config', 'mozu.config.json'];
-
-module.exports = function getConfig() {
-  var conf;
-  if (process.env.mozuHosted) {
-    try {
-      conf = JSON.parse(process.env.mozuHosted).sdkConfig;
-    } catch (e) {
-      throw new Error("Mozu hosted configuration was unreadable: " + e.message);
-    }
-  } else {
-    for (var i = legalConfigNames.length - 1; i >= 0; i--) {
-      try {
-        var filename = findup(legalConfigNames[i]);
-        if (filename) conf = fs.readFileSync(filename, 'utf-8');
-      } catch (e) {
-        continue;
-      }
-      if (conf) break;
-    }
-    if (!conf) {
-      throw new Error("No configuration file found. Either create a 'mozu.config' or 'mozu.config.json' file, or supply full config to the .client() method.");
-    }
-    try {
-      conf = JSON.parse(conf);
-    } catch (e) {
-      throw new Error("Configuration file was unreadable: " + e.message);
-    }
-  }
-  return conf;
-};
-},{"./tiny-findup":45,"fs":undefined}],36:[function(require,module,exports){
-'use strict';
-/**
- * Memoized function to turn URI Template text strings into Template objects.
- *
- * Assumes that unescaped URI Template variables are required,
- * since they're always base URLs in the current codegen.
- *
- * @param {String} templateText The URI template string.
- * @returns {Template} Object with a `render` method and a `keysUsed` object.
- */
-
-var expRe = /\{.+?\}/g;
-var varnameRe = /[\w_-]+/;
-function findKeys(rawTpt) {
-  var matches = rawTpt.match(expRe);
-  if (!matches) return [];
-  return matches.map(function (x) {
-    return x.match(varnameRe)[0];
-  });
-}
-
-var uritemplate = require('uri-template');
-var cache = {};
-module.exports = function (templateText) {
-  if (cache[templateText]) {
-    return cache[templateText];
-  }
-  var tpt = uritemplate.parse(templateText);
-  return cache[templateText] = {
-    render: function render(x) {
-      return tpt.expand(x);
-    },
-    keysUsed: findKeys(templateText)
-  };
-};
-},{"uri-template":71}],37:[function(require,module,exports){
-'use strict';
-
-var extend = require('./tiny-extend');
-var request = require('./request');
-
-module.exports = function (config) {
-
-  function doRequest(body, options) {
-    options = options || {};
-    var finalRequestConfig = extend({}, config, this.defaultRequestOptions, {
-      url: this.urlResolver(this, config.url, body),
-      context: this.context,
-      body: body
-    }, options);
-    var finalMethod = finalRequestConfig.method && finalRequestConfig.method.toUpperCase();
-
-    // this is magic and was never a good idea.
-    // the way the SDK was designed, the first argument to a method will get
-    // used both as the request payload and as an object to expand the URI
-    // template. this resulted in collisions, and in unexpected behavior with
-    // services that didn't expect strongly typed payloads. the below code
-    // tried to fix it magically, but under certain circumstances it would be
-    // very hard to debug.
-    //
-    // remove any properties from the body that were used to expand the url
-    // if (body && 
-    //     typeof body === "object" &&
-    //     !Array.isArray(body) &&
-    //     !options.body && 
-    //     !options.includeUrlVariablesInPostBody && 
-    //     (finalMethod === "POST" || finalMethod === "PUT")) {
-    //   finalRequestConfig.body = Object.keys(body).reduce(function(m, k) {
-    //     if (!urlSpec.keysUsed[k]) {
-    //       m[k] = body[k];
-    //     }
-    //     return m;
-    //   }, {});
-    //   if (Object.keys(finalRequestConfig.body).length === 0) {
-    //     delete finalRequestConfig.body;
-    //   }
-    // }
-
-
-    if (finalMethod === "GET" || finalMethod === "DELETE" && !options.body) {
-      delete finalRequestConfig.body;
-      // it's outlived its usefulness, we've already made a url with it
-    }
-    return request(finalRequestConfig, this.requestTransform);
-  }
-
-  return function (body, options) {
-    var doThisRequest = doRequest.bind(this, body, options);
-    if (process.env.mozuHosted) {
-      return doThisRequest();
-    } else if (!this.prerequisiteTasks || !Array.isArray(this.prerequisiteTasks)) {
-      return Promise.reject(new Error('Could not place request. No `prerequisiteTasks` array found on ' + 'the client object. To require no auth or URL prerequisites, set ' + '`this.prerequisiteTasks = [];` on the client object.'));
-    } else {
-      return this.prerequisiteTasks.reduce(function (p, t) {
-        return p.then(t);
-      }, Promise.resolve({
-        client: this,
-        options: options,
-        requestConfig: config
-      })).then(doThisRequest);
-    }
-  };
-};
-},{"./request":40,"./tiny-extend":44}],38:[function(require,module,exports){
-'use strict';
-
-var extend = require('./tiny-extend');
-
-var priorities = {
-  'app-claims': ['appClaims'],
-  'user-claims': ['userClaims'],
-  'tenant': ['tenantId'],
-  'site': ['siteId'],
-  'master-catalog': ['masterCatalog', 'masterCatalogId'],
-  'catalog': ['catalogId'],
-  'dataview-mode': ['dataViewMode']
-};
-
-var prioritiesKeys = Object.keys(priorities);
-
-module.exports = function (context) {
-  var newContext = extend({}, context);
-  return prioritiesKeys.reduce(function (ctx, dashKey) {
-    return priorities[dashKey].reduce(function (ctx, k) {
-      if (k in ctx) {
-        ctx[dashKey] = ctx[k];
-        delete ctx[k];
-      }
-      return ctx;
-    }, ctx);
-  }, newContext);
-};
-},{"./tiny-extend":44}],39:[function(require,module,exports){
-'use strict';
-
-var reISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*))(?:Z|(\+|-)([\d|:]*))?$/;
-module.exports = function parseDate(key, value) {
-  return typeof value === 'string' && reISO.exec(value) ? new Date(value) : value;
-};
-},{}],40:[function(require,module,exports){
-'use strict';
-/* global Promise */
-
-var constants = require('../constants');
-var extend = require('./tiny-extend');
-var url = require('url');
-var protocolHandlers = {
-  'http:': require('http'),
-  'https:': require('https')
-};
-var streamToCallback = require('./stream-to-callback');
-var parseJsonDates = require('./parse-json-dates');
-var errorify = require('./errorify');
-
-var USER_AGENT = 'Mozu Node SDK v' + constants.version + ' (Node.js ' + process.version + '; ' + process.platform + ' ' + process.arch + ')';
-
-/**
- * Handle headers
- */
-function makeHeaders(conf, payload) {
-  var headers;
-  function iterateHeaders(memo, key) {
-    if (conf.context[constants.headers[key]]) {
-      memo[constants.headerPrefix + constants.headers[key]] = conf.context[constants.headers[key]];
-    }
-    return memo;
-  }
-  if (conf.scope && conf.scope & constants.scopes.NONE) {
-    headers = {};
-  } else if (conf.scope && conf.scope & constants.scopes.APP_ONLY) {
-    headers = ['APPCLAIMS'].reduce(iterateHeaders, {});
-  } else {
-    headers = Object.keys(constants.headers).reduce(iterateHeaders, {});
-  }
-
-  if (payload) {
-    headers['Content-Length'] = payload.length.toString();
-  }
-
-  return extend({
-    'Accept': 'application/json',
-    'Connection': 'close',
-    'Content-Type': 'application/json; charset=utf-8',
-    'User-Agent': USER_AGENT
-  }, headers, conf.headers || {});
-}
-
-/**
- * Make an HTTP request to the Mozu API. This method populates headers based on the scope of the supplied context.
- * @param  {Object} options The request options, to be passed to the `request` module. Look up on NPM for details.
- * @return {Promise<ApiResponse,ApiError>}         A Promise that will fulfill as the JSON response from the API, or reject with an error as JSON from the API.
- */
-
-module.exports = function (options, transform) {
-  var conf = extend({}, options);
-  conf.method = (conf.method || 'get').toUpperCase();
-  var payload;
-  if (conf.body) {
-    payload = conf.body;
-    if (typeof payload !== "string" && !Buffer.isBuffer(payload)) {
-      payload = JSON.stringify(payload);
-    }
-    if (typeof payload === "string") {
-      payload = new Buffer(payload);
-    }
-  }
-  conf.headers = makeHeaders(conf, payload);
-  var uri = url.parse(conf.url);
-  var protocolHandler = protocolHandlers[uri.protocol];
-  if (!protocolHandler) {
-    throw new Error('Protocol ' + uri.protocol + ' not supported.');
-  }
-  return new Promise(function (resolve, reject) {
-    options = extend({}, options);
-    delete options.headers;
-    var requestOptions = extend({
-      hostname: uri.hostname,
-      port: uri.port || (uri.protocol === 'https:' ? 443 : 80),
-      method: conf.method,
-      path: uri.path,
-      headers: conf.headers,
-      agent: conf.agent
-    }, options);
-    if (typeof transform === "function") {
-      requestOptions = transform(requestOptions);
-    }
-    var complete = false;
-    var request = protocolHandler.request(requestOptions, function (response) {
-      streamToCallback(response, function (err, body) {
-        complete = true;
-        if (err) return reject(errorify(err, extend({ statusCode: response.statusCode, url: response.req.path }, response.headers)));
-        if (body) {
-          try {
-            if (response.headers["content-type"].indexOf('json') > -1 || response.headers["content-type"].indexOf('text/plain') > -1) body = JSON.parse(body, conf.parseDates !== false && parseJsonDates);
-          } catch (e) {
-            return reject(new Error('Response was not valid JSON: ' + e.message + '\n\n-----\n' + body));
-          }
-        }
-        if (response && response.statusCode >= 400 && response.statusCode < 600) {
-          return reject(errorify(body || response, extend({ statusCode: response.statusCode, url: response.req ? response.req.path : "" }, response.headers)));
-        }
-        return resolve(body);
-      });
-    });
-    var timeout = options.timeout || 20000;
-    request.setTimeout(timeout, function () {
-      if (!complete) {
-        request.abort();
-        reject(errorify("Timeout occurred: request to " + conf.url + " took more than " + timeout / 1000 + " seconds to complete."));
-      }
-    });
-    request.on('error', function (err) {
-      reject(errorify(err, request));
-    });
-    if (payload) request.write(payload);
-    request.end();
-  });
-};
-},{"../constants":23,"./errorify":34,"./parse-json-dates":39,"./stream-to-callback":41,"./tiny-extend":44,"http":undefined,"https":undefined,"url":74}],41:[function(require,module,exports){
-'use strict';
-
-var Stream = require('stream').Transform;
-
-module.exports = function streamToCallback(stream, cb) {
-  var buf = new Stream();
-  //stream.setEncoding('utf8');
-  stream.on('data', function (chunk) {
-    buf.push(chunk);
-  });
-  stream.on('error', cb);
-  stream.on('end', function () {
-    cb(null, buf.read());
-  });
-};
-},{"stream":68}],42:[function(require,module,exports){
-'use strict';
-
-var util = require('util'),
-    extend = require('./tiny-extend');
-
-/**
- * Subclass a constructor. Like Node's `util.inherits` but lets you pass additions to the prototype, and composes constructors.
- * @param  {Function} cons  The constructor to subclass.
- * @param  {Object} proto Methods to add to the prototype.
- * @return {Function}       The new subclass.
- */
-module.exports = function sub(cons, proto) {
-    var child = function child() {
-        cons.apply(this, arguments);
-    };
-    util.inherits(child, cons);
-    if (proto) extend(child.prototype, proto);
-    return child;
-};
-},{"./tiny-extend":44,"util":78}],43:[function(require,module,exports){
-'use strict';
-
-var TenantClient = void 0;
-var TenantsOrPromisesById = {};
-
-module.exports = {
-  add: function add(tenant) {
-    TenantsOrPromisesById[tenant.id] = tenant;
-  },
-  get: function get(tenantId, client, scope) {
-    TenantClient = TenantClient || require('../clients/platform/tenant');
-    var tenant = TenantsOrPromisesById[tenantId];
-    if (tenant) {
-      // may not be a promise if it was set en masse by AuthProvider.
-      // AuthProvider may set hundreds of tenants at once, so we let it
-      // set them directly for performance reasons.
-      if (typeof tenant.then !== "function") {
-        // and turn them into promises as needed.
-        tenant = TenantsOrPromisesById[tenantId] = Promise.resolve(tenant);
-      }
-      return tenant;
-    } else {
-      return TenantsOrPromisesById[tenantId] = new TenantClient(client).getTenant(null, { scope: scope });
-    }
-  }
-};
-},{"../clients/platform/tenant":21}],44:[function(require,module,exports){
-'use strict';
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-module.exports = function extend(target) {
-  return Array.prototype.slice.call(arguments, 1).reduce(function (out, next) {
-    if (next && (typeof next === "undefined" ? "undefined" : _typeof(next)) === "object") {
-      Object.keys(next).forEach(function (k) {
-        out[k] = next[k];
-      });
-    }
-    return out;
-  }, target);
-};
-},{}],45:[function(require,module,exports){
-'use strict';
-
-var path = require('path');
-var fs = require('fs');
-
-module.exports = function findup(filename) {
-  var maybeFile = path.resolve(filename),
-      dir = process.cwd(),
-      last,
-      exists;
-  while (!(exists = fs.existsSync(maybeFile)) && dir !== last) {
-    maybeFile = path.resolve(dir, '..', filename);
-    last = dir;
-    dir = path.resolve(dir, '..');
-  }
-  return exists && maybeFile;
-};
-},{"fs":undefined,"path":47}],46:[function(require,module,exports){
-'use strict';
-
-module.exports = {
-  current: "1.1705.17038.0"
-};
-},{}],47:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -2977,32 +1676,7 @@ var substr = 'ab'.substr(-1) === 'b'
     }
 ;
 
-},{}],48:[function(require,module,exports){
-module.exports = function pctEncode(regexp) {
-  regexp = regexp || /\W/g;
-  return function encode(string) {
-    string = String(string);
-    return string.replace(regexp, function (m) {
-      var c = m[0].charCodeAt(0)
-        , encoded = [];
-      if (c < 128) {
-        encoded.push(c);
-      } else if ((128 <= c && c < 2048)) {
-        encoded.push((c >> 6) | 192);
-        encoded.push((c & 63) | 128);
-      } else {
-        encoded.push((c >> 12) | 224);
-        encoded.push(((c >> 6) & 63) | 128);
-        encoded.push((c & 63) | 128);
-      }
-      return encoded.map(function (c) {
-        return '%' + c.toString(16).toUpperCase();
-      }).join('');
-    })
-  }
-}
-
-},{}],49:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 'use strict';
 
 if (!process.version ||
@@ -3047,7 +1721,7 @@ function nextTick(fn, arg1, arg2, arg3) {
   }
 }
 
-},{}],50:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 /*! https://mths.be/punycode v1.4.1 by @mathias */
 ;(function(root) {
 
@@ -3582,7 +2256,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 }(this));
 
-},{}],51:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3668,7 +2342,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],52:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3755,16 +2429,16 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],53:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":51,"./encode":52}],54:[function(require,module,exports){
+},{"./decode":18,"./encode":19}],21:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":55}],55:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":22}],22:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3889,7 +2563,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":57,"./_stream_writable":59,"core-util-is":7,"inherits":9,"process-nextick-args":49}],56:[function(require,module,exports){
+},{"./_stream_readable":24,"./_stream_writable":26,"core-util-is":7,"inherits":9,"process-nextick-args":16}],23:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3937,7 +2611,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":58,"core-util-is":7,"inherits":9}],57:[function(require,module,exports){
+},{"./_stream_transform":25,"core-util-is":7,"inherits":9}],24:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4945,7 +3619,7 @@ function indexOf(xs, x) {
   }
   return -1;
 }
-},{"./_stream_duplex":55,"./internal/streams/BufferList":60,"./internal/streams/destroy":61,"./internal/streams/stream":62,"core-util-is":7,"events":8,"inherits":9,"isarray":10,"process-nextick-args":49,"safe-buffer":67,"string_decoder/":69,"util":6}],58:[function(require,module,exports){
+},{"./_stream_duplex":22,"./internal/streams/BufferList":27,"./internal/streams/destroy":28,"./internal/streams/stream":29,"core-util-is":7,"events":8,"inherits":9,"isarray":10,"process-nextick-args":16,"safe-buffer":34,"string_decoder/":36,"util":6}],25:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5160,7 +3834,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":55,"core-util-is":7,"inherits":9}],59:[function(require,module,exports){
+},{"./_stream_duplex":22,"core-util-is":7,"inherits":9}],26:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5825,7 +4499,7 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-},{"./_stream_duplex":55,"./internal/streams/destroy":61,"./internal/streams/stream":62,"core-util-is":7,"inherits":9,"process-nextick-args":49,"safe-buffer":67,"util-deprecate":75}],60:[function(require,module,exports){
+},{"./_stream_duplex":22,"./internal/streams/destroy":28,"./internal/streams/stream":29,"core-util-is":7,"inherits":9,"process-nextick-args":16,"safe-buffer":34,"util-deprecate":39}],27:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -5900,7 +4574,7 @@ module.exports = function () {
 
   return BufferList;
 }();
-},{"safe-buffer":67}],61:[function(require,module,exports){
+},{"safe-buffer":34}],28:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -5973,13 +4647,13 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":49}],62:[function(require,module,exports){
+},{"process-nextick-args":16}],29:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":8}],63:[function(require,module,exports){
+},{"events":8}],30:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":64}],64:[function(require,module,exports){
+},{"./readable":31}],31:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -5988,13 +4662,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":55,"./lib/_stream_passthrough.js":56,"./lib/_stream_readable.js":57,"./lib/_stream_transform.js":58,"./lib/_stream_writable.js":59}],65:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":22,"./lib/_stream_passthrough.js":23,"./lib/_stream_readable.js":24,"./lib/_stream_transform.js":25,"./lib/_stream_writable.js":26}],32:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":64}],66:[function(require,module,exports){
+},{"./readable":31}],33:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":59}],67:[function(require,module,exports){
+},{"./lib/_stream_writable.js":26}],34:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -6058,7 +4732,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":undefined}],68:[function(require,module,exports){
+},{"buffer":undefined}],35:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -6187,7 +4861,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":8,"inherits":9,"readable-stream/duplex.js":54,"readable-stream/passthrough.js":63,"readable-stream/readable.js":64,"readable-stream/transform.js":65,"readable-stream/writable.js":66}],69:[function(require,module,exports){
+},{"events":8,"inherits":9,"readable-stream/duplex.js":21,"readable-stream/passthrough.js":30,"readable-stream/readable.js":31,"readable-stream/transform.js":32,"readable-stream/writable.js":33}],36:[function(require,module,exports){
 'use strict';
 
 var Buffer = require('safe-buffer').Buffer;
@@ -6460,7 +5134,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":67}],70:[function(require,module,exports){
+},{"safe-buffer":34}],37:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -8010,7 +6684,1869 @@ function simpleEnd(buf) {
   }
 }.call(this));
 
-},{}],71:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+var punycode = require('punycode');
+
+exports.parse = urlParse;
+exports.resolve = urlResolve;
+exports.resolveObject = urlResolveObject;
+exports.format = urlFormat;
+
+exports.Url = Url;
+
+function Url() {
+  this.protocol = null;
+  this.slashes = null;
+  this.auth = null;
+  this.host = null;
+  this.port = null;
+  this.hostname = null;
+  this.hash = null;
+  this.search = null;
+  this.query = null;
+  this.pathname = null;
+  this.path = null;
+  this.href = null;
+}
+
+// Reference: RFC 3986, RFC 1808, RFC 2396
+
+// define these here so at least they only have to be
+// compiled once on the first module load.
+var protocolPattern = /^([a-z0-9.+-]+:)/i,
+    portPattern = /:[0-9]*$/,
+
+    // RFC 2396: characters reserved for delimiting URLs.
+    // We actually just auto-escape these.
+    delims = ['<', '>', '"', '`', ' ', '\r', '\n', '\t'],
+
+    // RFC 2396: characters not allowed for various reasons.
+    unwise = ['{', '}', '|', '\\', '^', '`'].concat(delims),
+
+    // Allowed by RFCs, but cause of XSS attacks.  Always escape these.
+    autoEscape = ['\''].concat(unwise),
+    // Characters that are never ever allowed in a hostname.
+    // Note that any invalid chars are also handled, but these
+    // are the ones that are *expected* to be seen, so we fast-path
+    // them.
+    nonHostChars = ['%', '/', '?', ';', '#'].concat(autoEscape),
+    hostEndingChars = ['/', '?', '#'],
+    hostnameMaxLen = 255,
+    hostnamePartPattern = /^[a-z0-9A-Z_-]{0,63}$/,
+    hostnamePartStart = /^([a-z0-9A-Z_-]{0,63})(.*)$/,
+    // protocols that can allow "unsafe" and "unwise" chars.
+    unsafeProtocol = {
+      'javascript': true,
+      'javascript:': true
+    },
+    // protocols that never have a hostname.
+    hostlessProtocol = {
+      'javascript': true,
+      'javascript:': true
+    },
+    // protocols that always contain a // bit.
+    slashedProtocol = {
+      'http': true,
+      'https': true,
+      'ftp': true,
+      'gopher': true,
+      'file': true,
+      'http:': true,
+      'https:': true,
+      'ftp:': true,
+      'gopher:': true,
+      'file:': true
+    },
+    querystring = require('querystring');
+
+function urlParse(url, parseQueryString, slashesDenoteHost) {
+  if (url && isObject(url) && url instanceof Url) return url;
+
+  var u = new Url;
+  u.parse(url, parseQueryString, slashesDenoteHost);
+  return u;
+}
+
+Url.prototype.parse = function(url, parseQueryString, slashesDenoteHost) {
+  if (!isString(url)) {
+    throw new TypeError("Parameter 'url' must be a string, not " + typeof url);
+  }
+
+  var rest = url;
+
+  // trim before proceeding.
+  // This is to support parse stuff like "  http://foo.com  \n"
+  rest = rest.trim();
+
+  var proto = protocolPattern.exec(rest);
+  if (proto) {
+    proto = proto[0];
+    var lowerProto = proto.toLowerCase();
+    this.protocol = lowerProto;
+    rest = rest.substr(proto.length);
+  }
+
+  // figure out if it's got a host
+  // user@server is *always* interpreted as a hostname, and url
+  // resolution will treat //foo/bar as host=foo,path=bar because that's
+  // how the browser resolves relative URLs.
+  if (slashesDenoteHost || proto || rest.match(/^\/\/[^@\/]+@[^@\/]+/)) {
+    var slashes = rest.substr(0, 2) === '//';
+    if (slashes && !(proto && hostlessProtocol[proto])) {
+      rest = rest.substr(2);
+      this.slashes = true;
+    }
+  }
+
+  if (!hostlessProtocol[proto] &&
+      (slashes || (proto && !slashedProtocol[proto]))) {
+
+    // there's a hostname.
+    // the first instance of /, ?, ;, or # ends the host.
+    //
+    // If there is an @ in the hostname, then non-host chars *are* allowed
+    // to the left of the last @ sign, unless some host-ending character
+    // comes *before* the @-sign.
+    // URLs are obnoxious.
+    //
+    // ex:
+    // http://a@b@c/ => user:a@b host:c
+    // http://a@b?@c => user:a host:c path:/?@c
+
+    // v0.12 TODO(isaacs): This is not quite how Chrome does things.
+    // Review our test case against browsers more comprehensively.
+
+    // find the first instance of any hostEndingChars
+    var hostEnd = -1;
+    for (var i = 0; i < hostEndingChars.length; i++) {
+      var hec = rest.indexOf(hostEndingChars[i]);
+      if (hec !== -1 && (hostEnd === -1 || hec < hostEnd))
+        hostEnd = hec;
+    }
+
+    // at this point, either we have an explicit point where the
+    // auth portion cannot go past, or the last @ char is the decider.
+    var auth, atSign;
+    if (hostEnd === -1) {
+      // atSign can be anywhere.
+      atSign = rest.lastIndexOf('@');
+    } else {
+      // atSign must be in auth portion.
+      // http://a@b/c@d => host:b auth:a path:/c@d
+      atSign = rest.lastIndexOf('@', hostEnd);
+    }
+
+    // Now we have a portion which is definitely the auth.
+    // Pull that off.
+    if (atSign !== -1) {
+      auth = rest.slice(0, atSign);
+      rest = rest.slice(atSign + 1);
+      this.auth = decodeURIComponent(auth);
+    }
+
+    // the host is the remaining to the left of the first non-host char
+    hostEnd = -1;
+    for (var i = 0; i < nonHostChars.length; i++) {
+      var hec = rest.indexOf(nonHostChars[i]);
+      if (hec !== -1 && (hostEnd === -1 || hec < hostEnd))
+        hostEnd = hec;
+    }
+    // if we still have not hit it, then the entire thing is a host.
+    if (hostEnd === -1)
+      hostEnd = rest.length;
+
+    this.host = rest.slice(0, hostEnd);
+    rest = rest.slice(hostEnd);
+
+    // pull out port.
+    this.parseHost();
+
+    // we've indicated that there is a hostname,
+    // so even if it's empty, it has to be present.
+    this.hostname = this.hostname || '';
+
+    // if hostname begins with [ and ends with ]
+    // assume that it's an IPv6 address.
+    var ipv6Hostname = this.hostname[0] === '[' &&
+        this.hostname[this.hostname.length - 1] === ']';
+
+    // validate a little.
+    if (!ipv6Hostname) {
+      var hostparts = this.hostname.split(/\./);
+      for (var i = 0, l = hostparts.length; i < l; i++) {
+        var part = hostparts[i];
+        if (!part) continue;
+        if (!part.match(hostnamePartPattern)) {
+          var newpart = '';
+          for (var j = 0, k = part.length; j < k; j++) {
+            if (part.charCodeAt(j) > 127) {
+              // we replace non-ASCII char with a temporary placeholder
+              // we need this to make sure size of hostname is not
+              // broken by replacing non-ASCII by nothing
+              newpart += 'x';
+            } else {
+              newpart += part[j];
+            }
+          }
+          // we test again with ASCII char only
+          if (!newpart.match(hostnamePartPattern)) {
+            var validParts = hostparts.slice(0, i);
+            var notHost = hostparts.slice(i + 1);
+            var bit = part.match(hostnamePartStart);
+            if (bit) {
+              validParts.push(bit[1]);
+              notHost.unshift(bit[2]);
+            }
+            if (notHost.length) {
+              rest = '/' + notHost.join('.') + rest;
+            }
+            this.hostname = validParts.join('.');
+            break;
+          }
+        }
+      }
+    }
+
+    if (this.hostname.length > hostnameMaxLen) {
+      this.hostname = '';
+    } else {
+      // hostnames are always lower case.
+      this.hostname = this.hostname.toLowerCase();
+    }
+
+    if (!ipv6Hostname) {
+      // IDNA Support: Returns a puny coded representation of "domain".
+      // It only converts the part of the domain name that
+      // has non ASCII characters. I.e. it dosent matter if
+      // you call it with a domain that already is in ASCII.
+      var domainArray = this.hostname.split('.');
+      var newOut = [];
+      for (var i = 0; i < domainArray.length; ++i) {
+        var s = domainArray[i];
+        newOut.push(s.match(/[^A-Za-z0-9_-]/) ?
+            'xn--' + punycode.encode(s) : s);
+      }
+      this.hostname = newOut.join('.');
+    }
+
+    var p = this.port ? ':' + this.port : '';
+    var h = this.hostname || '';
+    this.host = h + p;
+    this.href += this.host;
+
+    // strip [ and ] from the hostname
+    // the host field still retains them, though
+    if (ipv6Hostname) {
+      this.hostname = this.hostname.substr(1, this.hostname.length - 2);
+      if (rest[0] !== '/') {
+        rest = '/' + rest;
+      }
+    }
+  }
+
+  // now rest is set to the post-host stuff.
+  // chop off any delim chars.
+  if (!unsafeProtocol[lowerProto]) {
+
+    // First, make 100% sure that any "autoEscape" chars get
+    // escaped, even if encodeURIComponent doesn't think they
+    // need to be.
+    for (var i = 0, l = autoEscape.length; i < l; i++) {
+      var ae = autoEscape[i];
+      var esc = encodeURIComponent(ae);
+      if (esc === ae) {
+        esc = escape(ae);
+      }
+      rest = rest.split(ae).join(esc);
+    }
+  }
+
+
+  // chop off from the tail first.
+  var hash = rest.indexOf('#');
+  if (hash !== -1) {
+    // got a fragment string.
+    this.hash = rest.substr(hash);
+    rest = rest.slice(0, hash);
+  }
+  var qm = rest.indexOf('?');
+  if (qm !== -1) {
+    this.search = rest.substr(qm);
+    this.query = rest.substr(qm + 1);
+    if (parseQueryString) {
+      this.query = querystring.parse(this.query);
+    }
+    rest = rest.slice(0, qm);
+  } else if (parseQueryString) {
+    // no query string, but parseQueryString still requested
+    this.search = '';
+    this.query = {};
+  }
+  if (rest) this.pathname = rest;
+  if (slashedProtocol[lowerProto] &&
+      this.hostname && !this.pathname) {
+    this.pathname = '/';
+  }
+
+  //to support http.request
+  if (this.pathname || this.search) {
+    var p = this.pathname || '';
+    var s = this.search || '';
+    this.path = p + s;
+  }
+
+  // finally, reconstruct the href based on what has been validated.
+  this.href = this.format();
+  return this;
+};
+
+// format a parsed object into a url string
+function urlFormat(obj) {
+  // ensure it's an object, and not a string url.
+  // If it's an obj, this is a no-op.
+  // this way, you can call url_format() on strings
+  // to clean up potentially wonky urls.
+  if (isString(obj)) obj = urlParse(obj);
+  if (!(obj instanceof Url)) return Url.prototype.format.call(obj);
+  return obj.format();
+}
+
+Url.prototype.format = function() {
+  var auth = this.auth || '';
+  if (auth) {
+    auth = encodeURIComponent(auth);
+    auth = auth.replace(/%3A/i, ':');
+    auth += '@';
+  }
+
+  var protocol = this.protocol || '',
+      pathname = this.pathname || '',
+      hash = this.hash || '',
+      host = false,
+      query = '';
+
+  if (this.host) {
+    host = auth + this.host;
+  } else if (this.hostname) {
+    host = auth + (this.hostname.indexOf(':') === -1 ?
+        this.hostname :
+        '[' + this.hostname + ']');
+    if (this.port) {
+      host += ':' + this.port;
+    }
+  }
+
+  if (this.query &&
+      isObject(this.query) &&
+      Object.keys(this.query).length) {
+    query = querystring.stringify(this.query);
+  }
+
+  var search = this.search || (query && ('?' + query)) || '';
+
+  if (protocol && protocol.substr(-1) !== ':') protocol += ':';
+
+  // only the slashedProtocols get the //.  Not mailto:, xmpp:, etc.
+  // unless they had them to begin with.
+  if (this.slashes ||
+      (!protocol || slashedProtocol[protocol]) && host !== false) {
+    host = '//' + (host || '');
+    if (pathname && pathname.charAt(0) !== '/') pathname = '/' + pathname;
+  } else if (!host) {
+    host = '';
+  }
+
+  if (hash && hash.charAt(0) !== '#') hash = '#' + hash;
+  if (search && search.charAt(0) !== '?') search = '?' + search;
+
+  pathname = pathname.replace(/[?#]/g, function(match) {
+    return encodeURIComponent(match);
+  });
+  search = search.replace('#', '%23');
+
+  return protocol + host + pathname + search + hash;
+};
+
+function urlResolve(source, relative) {
+  return urlParse(source, false, true).resolve(relative);
+}
+
+Url.prototype.resolve = function(relative) {
+  return this.resolveObject(urlParse(relative, false, true)).format();
+};
+
+function urlResolveObject(source, relative) {
+  if (!source) return relative;
+  return urlParse(source, false, true).resolveObject(relative);
+}
+
+Url.prototype.resolveObject = function(relative) {
+  if (isString(relative)) {
+    var rel = new Url();
+    rel.parse(relative, false, true);
+    relative = rel;
+  }
+
+  var result = new Url();
+  Object.keys(this).forEach(function(k) {
+    result[k] = this[k];
+  }, this);
+
+  // hash is always overridden, no matter what.
+  // even href="" will remove it.
+  result.hash = relative.hash;
+
+  // if the relative url is empty, then there's nothing left to do here.
+  if (relative.href === '') {
+    result.href = result.format();
+    return result;
+  }
+
+  // hrefs like //foo/bar always cut to the protocol.
+  if (relative.slashes && !relative.protocol) {
+    // take everything except the protocol from relative
+    Object.keys(relative).forEach(function(k) {
+      if (k !== 'protocol')
+        result[k] = relative[k];
+    });
+
+    //urlParse appends trailing / to urls like http://www.example.com
+    if (slashedProtocol[result.protocol] &&
+        result.hostname && !result.pathname) {
+      result.path = result.pathname = '/';
+    }
+
+    result.href = result.format();
+    return result;
+  }
+
+  if (relative.protocol && relative.protocol !== result.protocol) {
+    // if it's a known url protocol, then changing
+    // the protocol does weird things
+    // first, if it's not file:, then we MUST have a host,
+    // and if there was a path
+    // to begin with, then we MUST have a path.
+    // if it is file:, then the host is dropped,
+    // because that's known to be hostless.
+    // anything else is assumed to be absolute.
+    if (!slashedProtocol[relative.protocol]) {
+      Object.keys(relative).forEach(function(k) {
+        result[k] = relative[k];
+      });
+      result.href = result.format();
+      return result;
+    }
+
+    result.protocol = relative.protocol;
+    if (!relative.host && !hostlessProtocol[relative.protocol]) {
+      var relPath = (relative.pathname || '').split('/');
+      while (relPath.length && !(relative.host = relPath.shift()));
+      if (!relative.host) relative.host = '';
+      if (!relative.hostname) relative.hostname = '';
+      if (relPath[0] !== '') relPath.unshift('');
+      if (relPath.length < 2) relPath.unshift('');
+      result.pathname = relPath.join('/');
+    } else {
+      result.pathname = relative.pathname;
+    }
+    result.search = relative.search;
+    result.query = relative.query;
+    result.host = relative.host || '';
+    result.auth = relative.auth;
+    result.hostname = relative.hostname || relative.host;
+    result.port = relative.port;
+    // to support http.request
+    if (result.pathname || result.search) {
+      var p = result.pathname || '';
+      var s = result.search || '';
+      result.path = p + s;
+    }
+    result.slashes = result.slashes || relative.slashes;
+    result.href = result.format();
+    return result;
+  }
+
+  var isSourceAbs = (result.pathname && result.pathname.charAt(0) === '/'),
+      isRelAbs = (
+          relative.host ||
+          relative.pathname && relative.pathname.charAt(0) === '/'
+      ),
+      mustEndAbs = (isRelAbs || isSourceAbs ||
+                    (result.host && relative.pathname)),
+      removeAllDots = mustEndAbs,
+      srcPath = result.pathname && result.pathname.split('/') || [],
+      relPath = relative.pathname && relative.pathname.split('/') || [],
+      psychotic = result.protocol && !slashedProtocol[result.protocol];
+
+  // if the url is a non-slashed url, then relative
+  // links like ../.. should be able
+  // to crawl up to the hostname, as well.  This is strange.
+  // result.protocol has already been set by now.
+  // Later on, put the first path part into the host field.
+  if (psychotic) {
+    result.hostname = '';
+    result.port = null;
+    if (result.host) {
+      if (srcPath[0] === '') srcPath[0] = result.host;
+      else srcPath.unshift(result.host);
+    }
+    result.host = '';
+    if (relative.protocol) {
+      relative.hostname = null;
+      relative.port = null;
+      if (relative.host) {
+        if (relPath[0] === '') relPath[0] = relative.host;
+        else relPath.unshift(relative.host);
+      }
+      relative.host = null;
+    }
+    mustEndAbs = mustEndAbs && (relPath[0] === '' || srcPath[0] === '');
+  }
+
+  if (isRelAbs) {
+    // it's absolute.
+    result.host = (relative.host || relative.host === '') ?
+                  relative.host : result.host;
+    result.hostname = (relative.hostname || relative.hostname === '') ?
+                      relative.hostname : result.hostname;
+    result.search = relative.search;
+    result.query = relative.query;
+    srcPath = relPath;
+    // fall through to the dot-handling below.
+  } else if (relPath.length) {
+    // it's relative
+    // throw away the existing file, and take the new path instead.
+    if (!srcPath) srcPath = [];
+    srcPath.pop();
+    srcPath = srcPath.concat(relPath);
+    result.search = relative.search;
+    result.query = relative.query;
+  } else if (!isNullOrUndefined(relative.search)) {
+    // just pull out the search.
+    // like href='?foo'.
+    // Put this after the other two cases because it simplifies the booleans
+    if (psychotic) {
+      result.hostname = result.host = srcPath.shift();
+      //occationaly the auth can get stuck only in host
+      //this especialy happens in cases like
+      //url.resolveObject('mailto:local1@domain1', 'local2@domain2')
+      var authInHost = result.host && result.host.indexOf('@') > 0 ?
+                       result.host.split('@') : false;
+      if (authInHost) {
+        result.auth = authInHost.shift();
+        result.host = result.hostname = authInHost.shift();
+      }
+    }
+    result.search = relative.search;
+    result.query = relative.query;
+    //to support http.request
+    if (!isNull(result.pathname) || !isNull(result.search)) {
+      result.path = (result.pathname ? result.pathname : '') +
+                    (result.search ? result.search : '');
+    }
+    result.href = result.format();
+    return result;
+  }
+
+  if (!srcPath.length) {
+    // no path at all.  easy.
+    // we've already handled the other stuff above.
+    result.pathname = null;
+    //to support http.request
+    if (result.search) {
+      result.path = '/' + result.search;
+    } else {
+      result.path = null;
+    }
+    result.href = result.format();
+    return result;
+  }
+
+  // if a url ENDs in . or .., then it must get a trailing slash.
+  // however, if it ends in anything else non-slashy,
+  // then it must NOT get a trailing slash.
+  var last = srcPath.slice(-1)[0];
+  var hasTrailingSlash = (
+      (result.host || relative.host) && (last === '.' || last === '..') ||
+      last === '');
+
+  // strip single dots, resolve double dots to parent dir
+  // if the path tries to go above the root, `up` ends up > 0
+  var up = 0;
+  for (var i = srcPath.length; i >= 0; i--) {
+    last = srcPath[i];
+    if (last == '.') {
+      srcPath.splice(i, 1);
+    } else if (last === '..') {
+      srcPath.splice(i, 1);
+      up++;
+    } else if (up) {
+      srcPath.splice(i, 1);
+      up--;
+    }
+  }
+
+  // if the path is allowed to go above the root, restore leading ..s
+  if (!mustEndAbs && !removeAllDots) {
+    for (; up--; up) {
+      srcPath.unshift('..');
+    }
+  }
+
+  if (mustEndAbs && srcPath[0] !== '' &&
+      (!srcPath[0] || srcPath[0].charAt(0) !== '/')) {
+    srcPath.unshift('');
+  }
+
+  if (hasTrailingSlash && (srcPath.join('/').substr(-1) !== '/')) {
+    srcPath.push('');
+  }
+
+  var isAbsolute = srcPath[0] === '' ||
+      (srcPath[0] && srcPath[0].charAt(0) === '/');
+
+  // put the host back
+  if (psychotic) {
+    result.hostname = result.host = isAbsolute ? '' :
+                                    srcPath.length ? srcPath.shift() : '';
+    //occationaly the auth can get stuck only in host
+    //this especialy happens in cases like
+    //url.resolveObject('mailto:local1@domain1', 'local2@domain2')
+    var authInHost = result.host && result.host.indexOf('@') > 0 ?
+                     result.host.split('@') : false;
+    if (authInHost) {
+      result.auth = authInHost.shift();
+      result.host = result.hostname = authInHost.shift();
+    }
+  }
+
+  mustEndAbs = mustEndAbs || (result.host && srcPath.length);
+
+  if (mustEndAbs && !isAbsolute) {
+    srcPath.unshift('');
+  }
+
+  if (!srcPath.length) {
+    result.pathname = null;
+    result.path = null;
+  } else {
+    result.pathname = srcPath.join('/');
+  }
+
+  //to support request.http
+  if (!isNull(result.pathname) || !isNull(result.search)) {
+    result.path = (result.pathname ? result.pathname : '') +
+                  (result.search ? result.search : '');
+  }
+  result.auth = relative.auth || result.auth;
+  result.slashes = result.slashes || relative.slashes;
+  result.href = result.format();
+  return result;
+};
+
+Url.prototype.parseHost = function() {
+  var host = this.host;
+  var port = portPattern.exec(host);
+  if (port) {
+    port = port[0];
+    if (port !== ':') {
+      this.port = port.substr(1);
+    }
+    host = host.substr(0, host.length - port.length);
+  }
+  if (host) this.hostname = host;
+};
+
+function isString(arg) {
+  return typeof arg === "string";
+}
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+
+function isNull(arg) {
+  return arg === null;
+}
+function isNullOrUndefined(arg) {
+  return  arg == null;
+}
+
+},{"punycode":17,"querystring":20}],39:[function(require,module,exports){
+
+/**
+ * Module exports.
+ */
+
+module.exports = deprecate;
+
+/**
+ * Mark that a method should not be used.
+ * Returns a modified function which warns once by default.
+ *
+ * If `localStorage.noDeprecation = true` is set, then it is a no-op.
+ *
+ * If `localStorage.throwDeprecation = true` is set, then deprecated functions
+ * will throw an Error when invoked.
+ *
+ * If `localStorage.traceDeprecation = true` is set, then deprecated functions
+ * will invoke `console.trace()` instead of `console.error()`.
+ *
+ * @param {Function} fn - the function to deprecate
+ * @param {String} msg - the string to print to the console when `fn` is invoked
+ * @returns {Function} a new "deprecated" version of `fn`
+ * @api public
+ */
+
+function deprecate (fn, msg) {
+  if (config('noDeprecation')) {
+    return fn;
+  }
+
+  var warned = false;
+  function deprecated() {
+    if (!warned) {
+      if (config('throwDeprecation')) {
+        throw new Error(msg);
+      } else if (config('traceDeprecation')) {
+        console.trace(msg);
+      } else {
+        console.warn(msg);
+      }
+      warned = true;
+    }
+    return fn.apply(this, arguments);
+  }
+
+  return deprecated;
+}
+
+/**
+ * Checks `localStorage` for boolean values for the given `name`.
+ *
+ * @param {String} name
+ * @returns {Boolean}
+ * @api private
+ */
+
+function config (name) {
+  // accessing global.localStorage can trigger a DOMException in sandboxed iframes
+  try {
+    if (!global.localStorage) return false;
+  } catch (_) {
+    return false;
+  }
+  var val = global.localStorage[name];
+  if (null == val) return false;
+  return String(val).toLowerCase() === 'true';
+}
+
+},{}],40:[function(require,module,exports){
+arguments[4][9][0].apply(exports,arguments)
+},{"dup":9}],41:[function(require,module,exports){
+module.exports = function isBuffer(arg) {
+  return arg && typeof arg === 'object'
+    && typeof arg.copy === 'function'
+    && typeof arg.fill === 'function'
+    && typeof arg.readUInt8 === 'function';
+}
+},{}],42:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+var formatRegExp = /%[sdj%]/g;
+exports.format = function(f) {
+  if (!isString(f)) {
+    var objects = [];
+    for (var i = 0; i < arguments.length; i++) {
+      objects.push(inspect(arguments[i]));
+    }
+    return objects.join(' ');
+  }
+
+  var i = 1;
+  var args = arguments;
+  var len = args.length;
+  var str = String(f).replace(formatRegExp, function(x) {
+    if (x === '%%') return '%';
+    if (i >= len) return x;
+    switch (x) {
+      case '%s': return String(args[i++]);
+      case '%d': return Number(args[i++]);
+      case '%j':
+        try {
+          return JSON.stringify(args[i++]);
+        } catch (_) {
+          return '[Circular]';
+        }
+      default:
+        return x;
+    }
+  });
+  for (var x = args[i]; i < len; x = args[++i]) {
+    if (isNull(x) || !isObject(x)) {
+      str += ' ' + x;
+    } else {
+      str += ' ' + inspect(x);
+    }
+  }
+  return str;
+};
+
+
+// Mark that a method should not be used.
+// Returns a modified function which warns once by default.
+// If --no-deprecation is set, then it is a no-op.
+exports.deprecate = function(fn, msg) {
+  // Allow for deprecating things in the process of starting up.
+  if (isUndefined(global.process)) {
+    return function() {
+      return exports.deprecate(fn, msg).apply(this, arguments);
+    };
+  }
+
+  if (process.noDeprecation === true) {
+    return fn;
+  }
+
+  var warned = false;
+  function deprecated() {
+    if (!warned) {
+      if (process.throwDeprecation) {
+        throw new Error(msg);
+      } else if (process.traceDeprecation) {
+        console.trace(msg);
+      } else {
+        console.error(msg);
+      }
+      warned = true;
+    }
+    return fn.apply(this, arguments);
+  }
+
+  return deprecated;
+};
+
+
+var debugs = {};
+var debugEnviron;
+exports.debuglog = function(set) {
+  if (isUndefined(debugEnviron))
+    debugEnviron = process.env.NODE_DEBUG || '';
+  set = set.toUpperCase();
+  if (!debugs[set]) {
+    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
+      var pid = process.pid;
+      debugs[set] = function() {
+        var msg = exports.format.apply(exports, arguments);
+        console.error('%s %d: %s', set, pid, msg);
+      };
+    } else {
+      debugs[set] = function() {};
+    }
+  }
+  return debugs[set];
+};
+
+
+/**
+ * Echos the value of a value. Trys to print the value out
+ * in the best way possible given the different types.
+ *
+ * @param {Object} obj The object to print out.
+ * @param {Object} opts Optional options object that alters the output.
+ */
+/* legacy: obj, showHidden, depth, colors*/
+function inspect(obj, opts) {
+  // default options
+  var ctx = {
+    seen: [],
+    stylize: stylizeNoColor
+  };
+  // legacy...
+  if (arguments.length >= 3) ctx.depth = arguments[2];
+  if (arguments.length >= 4) ctx.colors = arguments[3];
+  if (isBoolean(opts)) {
+    // legacy...
+    ctx.showHidden = opts;
+  } else if (opts) {
+    // got an "options" object
+    exports._extend(ctx, opts);
+  }
+  // set default options
+  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
+  if (isUndefined(ctx.depth)) ctx.depth = 2;
+  if (isUndefined(ctx.colors)) ctx.colors = false;
+  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
+  if (ctx.colors) ctx.stylize = stylizeWithColor;
+  return formatValue(ctx, obj, ctx.depth);
+}
+exports.inspect = inspect;
+
+
+// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
+inspect.colors = {
+  'bold' : [1, 22],
+  'italic' : [3, 23],
+  'underline' : [4, 24],
+  'inverse' : [7, 27],
+  'white' : [37, 39],
+  'grey' : [90, 39],
+  'black' : [30, 39],
+  'blue' : [34, 39],
+  'cyan' : [36, 39],
+  'green' : [32, 39],
+  'magenta' : [35, 39],
+  'red' : [31, 39],
+  'yellow' : [33, 39]
+};
+
+// Don't use 'blue' not visible on cmd.exe
+inspect.styles = {
+  'special': 'cyan',
+  'number': 'yellow',
+  'boolean': 'yellow',
+  'undefined': 'grey',
+  'null': 'bold',
+  'string': 'green',
+  'date': 'magenta',
+  // "name": intentionally not styling
+  'regexp': 'red'
+};
+
+
+function stylizeWithColor(str, styleType) {
+  var style = inspect.styles[styleType];
+
+  if (style) {
+    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
+           '\u001b[' + inspect.colors[style][1] + 'm';
+  } else {
+    return str;
+  }
+}
+
+
+function stylizeNoColor(str, styleType) {
+  return str;
+}
+
+
+function arrayToHash(array) {
+  var hash = {};
+
+  array.forEach(function(val, idx) {
+    hash[val] = true;
+  });
+
+  return hash;
+}
+
+
+function formatValue(ctx, value, recurseTimes) {
+  // Provide a hook for user-specified inspect functions.
+  // Check that value is an object with an inspect function on it
+  if (ctx.customInspect &&
+      value &&
+      isFunction(value.inspect) &&
+      // Filter out the util module, it's inspect function is special
+      value.inspect !== exports.inspect &&
+      // Also filter out any prototype objects using the circular check.
+      !(value.constructor && value.constructor.prototype === value)) {
+    var ret = value.inspect(recurseTimes, ctx);
+    if (!isString(ret)) {
+      ret = formatValue(ctx, ret, recurseTimes);
+    }
+    return ret;
+  }
+
+  // Primitive types cannot have properties
+  var primitive = formatPrimitive(ctx, value);
+  if (primitive) {
+    return primitive;
+  }
+
+  // Look up the keys of the object.
+  var keys = Object.keys(value);
+  var visibleKeys = arrayToHash(keys);
+
+  if (ctx.showHidden) {
+    keys = Object.getOwnPropertyNames(value);
+  }
+
+  // IE doesn't make error fields non-enumerable
+  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
+  if (isError(value)
+      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
+    return formatError(value);
+  }
+
+  // Some type of object without properties can be shortcutted.
+  if (keys.length === 0) {
+    if (isFunction(value)) {
+      var name = value.name ? ': ' + value.name : '';
+      return ctx.stylize('[Function' + name + ']', 'special');
+    }
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    }
+    if (isDate(value)) {
+      return ctx.stylize(Date.prototype.toString.call(value), 'date');
+    }
+    if (isError(value)) {
+      return formatError(value);
+    }
+  }
+
+  var base = '', array = false, braces = ['{', '}'];
+
+  // Make Array say that they are Array
+  if (isArray(value)) {
+    array = true;
+    braces = ['[', ']'];
+  }
+
+  // Make functions say that they are functions
+  if (isFunction(value)) {
+    var n = value.name ? ': ' + value.name : '';
+    base = ' [Function' + n + ']';
+  }
+
+  // Make RegExps say that they are RegExps
+  if (isRegExp(value)) {
+    base = ' ' + RegExp.prototype.toString.call(value);
+  }
+
+  // Make dates with properties first say the date
+  if (isDate(value)) {
+    base = ' ' + Date.prototype.toUTCString.call(value);
+  }
+
+  // Make error with message first say the error
+  if (isError(value)) {
+    base = ' ' + formatError(value);
+  }
+
+  if (keys.length === 0 && (!array || value.length == 0)) {
+    return braces[0] + base + braces[1];
+  }
+
+  if (recurseTimes < 0) {
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    } else {
+      return ctx.stylize('[Object]', 'special');
+    }
+  }
+
+  ctx.seen.push(value);
+
+  var output;
+  if (array) {
+    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
+  } else {
+    output = keys.map(function(key) {
+      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
+    });
+  }
+
+  ctx.seen.pop();
+
+  return reduceToSingleString(output, base, braces);
+}
+
+
+function formatPrimitive(ctx, value) {
+  if (isUndefined(value))
+    return ctx.stylize('undefined', 'undefined');
+  if (isString(value)) {
+    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
+                                             .replace(/'/g, "\\'")
+                                             .replace(/\\"/g, '"') + '\'';
+    return ctx.stylize(simple, 'string');
+  }
+  if (isNumber(value))
+    return ctx.stylize('' + value, 'number');
+  if (isBoolean(value))
+    return ctx.stylize('' + value, 'boolean');
+  // For some reason typeof null is "object", so special case here.
+  if (isNull(value))
+    return ctx.stylize('null', 'null');
+}
+
+
+function formatError(value) {
+  return '[' + Error.prototype.toString.call(value) + ']';
+}
+
+
+function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
+  var output = [];
+  for (var i = 0, l = value.length; i < l; ++i) {
+    if (hasOwnProperty(value, String(i))) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          String(i), true));
+    } else {
+      output.push('');
+    }
+  }
+  keys.forEach(function(key) {
+    if (!key.match(/^\d+$/)) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          key, true));
+    }
+  });
+  return output;
+}
+
+
+function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
+  var name, str, desc;
+  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
+  if (desc.get) {
+    if (desc.set) {
+      str = ctx.stylize('[Getter/Setter]', 'special');
+    } else {
+      str = ctx.stylize('[Getter]', 'special');
+    }
+  } else {
+    if (desc.set) {
+      str = ctx.stylize('[Setter]', 'special');
+    }
+  }
+  if (!hasOwnProperty(visibleKeys, key)) {
+    name = '[' + key + ']';
+  }
+  if (!str) {
+    if (ctx.seen.indexOf(desc.value) < 0) {
+      if (isNull(recurseTimes)) {
+        str = formatValue(ctx, desc.value, null);
+      } else {
+        str = formatValue(ctx, desc.value, recurseTimes - 1);
+      }
+      if (str.indexOf('\n') > -1) {
+        if (array) {
+          str = str.split('\n').map(function(line) {
+            return '  ' + line;
+          }).join('\n').substr(2);
+        } else {
+          str = '\n' + str.split('\n').map(function(line) {
+            return '   ' + line;
+          }).join('\n');
+        }
+      }
+    } else {
+      str = ctx.stylize('[Circular]', 'special');
+    }
+  }
+  if (isUndefined(name)) {
+    if (array && key.match(/^\d+$/)) {
+      return str;
+    }
+    name = JSON.stringify('' + key);
+    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+      name = name.substr(1, name.length - 2);
+      name = ctx.stylize(name, 'name');
+    } else {
+      name = name.replace(/'/g, "\\'")
+                 .replace(/\\"/g, '"')
+                 .replace(/(^"|"$)/g, "'");
+      name = ctx.stylize(name, 'string');
+    }
+  }
+
+  return name + ': ' + str;
+}
+
+
+function reduceToSingleString(output, base, braces) {
+  var numLinesEst = 0;
+  var length = output.reduce(function(prev, cur) {
+    numLinesEst++;
+    if (cur.indexOf('\n') >= 0) numLinesEst++;
+    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
+  }, 0);
+
+  if (length > 60) {
+    return braces[0] +
+           (base === '' ? '' : base + '\n ') +
+           ' ' +
+           output.join(',\n  ') +
+           ' ' +
+           braces[1];
+  }
+
+  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
+}
+
+
+// NOTE: These type checking functions intentionally don't use `instanceof`
+// because it is fragile and can be easily faked with `Object.create()`.
+function isArray(ar) {
+  return Array.isArray(ar);
+}
+exports.isArray = isArray;
+
+function isBoolean(arg) {
+  return typeof arg === 'boolean';
+}
+exports.isBoolean = isBoolean;
+
+function isNull(arg) {
+  return arg === null;
+}
+exports.isNull = isNull;
+
+function isNullOrUndefined(arg) {
+  return arg == null;
+}
+exports.isNullOrUndefined = isNullOrUndefined;
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+exports.isNumber = isNumber;
+
+function isString(arg) {
+  return typeof arg === 'string';
+}
+exports.isString = isString;
+
+function isSymbol(arg) {
+  return typeof arg === 'symbol';
+}
+exports.isSymbol = isSymbol;
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+exports.isUndefined = isUndefined;
+
+function isRegExp(re) {
+  return isObject(re) && objectToString(re) === '[object RegExp]';
+}
+exports.isRegExp = isRegExp;
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+exports.isObject = isObject;
+
+function isDate(d) {
+  return isObject(d) && objectToString(d) === '[object Date]';
+}
+exports.isDate = isDate;
+
+function isError(e) {
+  return isObject(e) &&
+      (objectToString(e) === '[object Error]' || e instanceof Error);
+}
+exports.isError = isError;
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+exports.isFunction = isFunction;
+
+function isPrimitive(arg) {
+  return arg === null ||
+         typeof arg === 'boolean' ||
+         typeof arg === 'number' ||
+         typeof arg === 'string' ||
+         typeof arg === 'symbol' ||  // ES6 symbol
+         typeof arg === 'undefined';
+}
+exports.isPrimitive = isPrimitive;
+
+exports.isBuffer = require('./support/isBuffer');
+
+function objectToString(o) {
+  return Object.prototype.toString.call(o);
+}
+
+
+function pad(n) {
+  return n < 10 ? '0' + n.toString(10) : n.toString(10);
+}
+
+
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec'];
+
+// 26 Feb 16:19:34
+function timestamp() {
+  var d = new Date();
+  var time = [pad(d.getHours()),
+              pad(d.getMinutes()),
+              pad(d.getSeconds())].join(':');
+  return [d.getDate(), months[d.getMonth()], time].join(' ');
+}
+
+
+// log is just a thin wrapper to console.log that prepends a timestamp
+exports.log = function() {
+  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
+};
+
+
+/**
+ * Inherit the prototype methods from one constructor into another.
+ *
+ * The Function.prototype.inherits from lang.js rewritten as a standalone
+ * function (not on Function.prototype). NOTE: If this file is to be loaded
+ * during bootstrapping this function needs to be rewritten using some native
+ * functions as prototype setup using normal JavaScript does not work as
+ * expected during bootstrapping (see mirror.js in r114903).
+ *
+ * @param {function} ctor Constructor function which needs to inherit the
+ *     prototype.
+ * @param {function} superCtor Constructor function to inherit prototype from.
+ */
+exports.inherits = require('inherits');
+
+exports._extend = function(origin, add) {
+  // Don't do anything if add isn't an object
+  if (!add || !isObject(add)) return origin;
+
+  var keys = Object.keys(add);
+  var i = keys.length;
+  while (i--) {
+    origin[keys[i]] = add[keys[i]];
+  }
+  return origin;
+};
+
+function hasOwnProperty(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+},{"./support/isBuffer":41,"inherits":40}],43:[function(require,module,exports){
+'use strict';
+
+var extend = require('./utils/tiny-extend'),
+    _sub = require('./utils/sub'),
+    constants = require('./constants'),
+    makeMethod = require('./utils/make-method'),
+    getConfig = require('./utils/get-config'),
+    normalizeContext = require('./utils/normalize-context'),
+    inMemoryAuthCache = require('./plugins/in-memory-auth-cache'),
+    serverSidePrerequisites = require('./plugins/server-side-prerequisites'),
+    expandUriTemplateFromContext = require('./plugins/expand-uritemplate-from-context'),
+    versionKey = constants.headers.VERSION,
+    version = constants.version;
+
+var NodeDefaultPlugins = {
+  authenticationStorage: inMemoryAuthCache,
+  prerequisiteTasks: serverSidePrerequisites,
+  urlResolver: expandUriTemplateFromContext
+};
+
+function applyDefaultPlugins(client, plugins) {
+  Object.keys(plugins).forEach(function (n) {
+    return client[n] = plugins[n](client);
+  });
+}
+
+function makeClient(clientCls) {
+  return function (cfg) {
+    return new clientCls(extend({}, this, cfg));
+  };
+}
+
+function cloneContext(ctx) {
+  var newCtx;
+  if (!ctx) return {};
+  try {
+    newCtx = JSON.parse(JSON.stringify(ctx));
+  } catch (e) {
+    throw new Error('Could not serialize context when creating Client. ' + 'Do not assign non-serializable objects to the client.context.');
+  }
+  newCtx[versionKey] = newCtx[versionKey] || version;
+  return newCtx;
+}
+
+function isContextSufficient(context) {
+  return context && context.baseUrl;
+}
+
+function Client(cfg) {
+  cfg = cfg || {};
+  var context = normalizeContext(cfg.apiContext || cfg.context || {});
+  if (!isContextSufficient(context)) {
+    context = context ? extend(getConfig(), context) : getConfig();
+  }
+  this.context = cloneContext(context);
+  this.defaultRequestOptions = extend({}, Client.defaultRequestOptions, cfg.defaultRequestOptions);
+  // apply the right default plugin config for a server-side environment
+  // (that is, Node, ArcJS, or perhaps Rhino/Nashorn/WinJS)
+  if (typeof process !== "undefined") {
+    applyDefaultPlugins(this, NodeDefaultPlugins);
+  }
+  if (cfg.plugins) {
+    // override plugins if necessary
+    this.plugins = cfg.plugins.slice();
+    this.plugins.forEach(function (p) {
+      p(this);
+    }.bind(this));
+  }
+}
+
+// statics
+extend(Client, {
+  defaultRequestOptions: {},
+  method: makeMethod,
+  sub: function sub(methods) {
+    return makeClient(_sub(Client, methods));
+  },
+  constants: constants
+});
+
+module.exports = Client;
+},{"./constants":51,"./plugins/expand-uritemplate-from-context":57,"./plugins/in-memory-auth-cache":58,"./plugins/server-side-prerequisites":64,"./utils/get-config":68,"./utils/make-method":70,"./utils/normalize-context":71,"./utils/sub":75,"./utils/tiny-extend":77}],44:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getCart: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/carts/{cartId}?responseFields={responseFields}'
+	}),
+	getOrCreateCart: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/carts/current?responseFields={responseFields}'
+	}),
+	getCartSummary: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/carts/summary?responseFields={responseFields}'
+	}),
+	getUserCartSummary: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/carts/user/{userId}/summary?responseFields={responseFields}'
+	}),
+	getUserCart: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/carts/user/{userId}?responseFields={responseFields}'
+	}),
+	updateCart: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/carts/current?responseFields={responseFields}'
+	}),
+	deleteCart: Client.method({
+		method: constants.verbs.DELETE,
+		url: '{+tenantPod}api/commerce/carts/{cartId}'
+	}),
+	deleteCurrentCart: Client.method({
+		method: constants.verbs.DELETE,
+		url: '{+tenantPod}api/commerce/carts/current'
+	})
+});
+
+},{"../../client":43}],45:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getCheckouts: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/checkouts/?startIndex={startIndex}&pageSize={pageSize}&sortBy={sortBy}&filter={filter}&q={q}&qLimit={qLimit}&responseFields={responseFields}'
+	}),
+	getAvailableActions: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}/actions'
+	}),
+	getAvailableShipmentMethods: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}/shipments/methods'
+	}),
+	getCheckout: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}?responseFields={responseFields}'
+	}),
+	createCheckoutFromCart: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/checkouts/?cartId={cartId}&responseFields={responseFields}'
+	}),
+	performCheckoutAction: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}/actions?responseFields={responseFields}'
+	}),
+	setShippingMethods: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}/shippingMethods?responseFields={responseFields}'
+	}),
+	updateCheckout: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}?responseFields={responseFields}'
+	}),
+	resendCheckoutConfirmationEmail: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/checkouts/{checkoutId}/email/resend'
+	})
+});
+
+},{"../../client":43}],46:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getOrders: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/orders/?startIndex={startIndex}&pageSize={pageSize}&sortBy={sortBy}&filter={filter}&q={q}&qLimit={qLimit}&responseFields={responseFields}'
+	}),
+	getAvailableActions: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/actions'
+	}),
+	getTaxableOrders: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/taxableorders'
+	}),
+	getOrder: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/orders/{orderId}?draft={draft}&responseFields={responseFields}'
+	}),
+	createOrderFromCart: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/orders/?cartId={cartId}&responseFields={responseFields}'
+	}),
+	createOrder: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/orders/?responseFields={responseFields}'
+	}),
+	performOrderAction: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/actions?responseFields={responseFields}'
+	}),
+	processDigitalWallet: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/digitalWallet/{digitalWalletType}?responseFields={responseFields}'
+	}),
+	updateOrderDiscount: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/discounts/{discountId}?updatemode={updateMode}&version={version}&responseFields={responseFields}'
+	}),
+	deleteOrderDraft: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/draft?version={version}'
+	}),
+	resendOrderConfirmationEmail: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/email/resend'
+	}),
+	changeOrderPriceList: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/priceList?updatemode={updateMode}&version={version}&responseFields={responseFields}'
+	}),
+	changeOrderUserId: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}/users?responseFields={responseFields}'
+	}),
+	updateOrder: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/orders/{orderId}?updatemode={updateMode}&version={version}&responseFields={responseFields}'
+	})
+});
+
+},{"../../client":43}],47:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getThirdPartyPaymentWorkflowWithValues: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflow/{fullyQualifiedName}?responseFields={responseFields}'
+	}),
+	getThirdPartyPaymentWorkflows: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflows'
+	}),
+	addThirdPartyPaymentWorkflow: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflows'
+	}),
+	deleteThirdPartyPaymentWorkflow: Client.method({
+		method: constants.verbs.DELETE,
+		url: '{+tenantPod}api/commerce/settings/checkout/paymentsettings/thirdpartyworkflows/{fullyQualifiedName}'
+	})
+});
+
+},{"../../../../client":43}],48:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getCustomRouteSettings: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
+	}),
+	createCustomRouteSettings: Client.method({
+		method: constants.verbs.POST,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
+	}),
+	updateCustomRouteSettings: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes?responseFields={responseFields}'
+	}),
+	deleteCustomRouteSettings: Client.method({
+		method: constants.verbs.DELETE,
+		url: '{+tenantPod}api/commerce/settings/general/customroutes'
+	})
+});
+
+},{"../../../../client":43}],49:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getTenant: Client.method({
+		method: constants.verbs.GET,
+		url: '{+homePod}api/platform/tenants/{tenantId}?responseFields={responseFields}'
+	})
+});
+
+},{"../../client":43}],50:[function(require,module,exports){
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by CodeZu.     
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+var Client = require('../../client'), constants = Client.constants;
+
+module.exports = Client.sub({
+	getExtensions: Client.method({
+		method: constants.verbs.GET,
+		url: '{+tenantPod}api/platform/extensions/?responseFields={responseFields}'
+	}),
+	updateExtensions: Client.method({
+		method: constants.verbs.PUT,
+		url: '{+tenantPod}api/platform/extensions/?responseFields={responseFields}'
+	})
+});
+
+},{"../../client":43}],51:[function(require,module,exports){
+'use strict';
+
+var version = require('./version'),
+    DEVELOPER = 1,
+    ADMINUSER = 2,
+    SHOPPER = 4,
+    TENANT = 8,
+    SITE = 16,
+    MASTERCATALOG = 32,
+    CATALOG = 64,
+    APP_ONLY = 128,
+    NONE = 256,
+    APP_REQUIRED = 512;
+
+// scopes are not yet in use, but when the services can reflect
+// their required scope, here will be all the bitmask constants
+
+// some contexts are always additive
+
+TENANT |= ADMINUSER;
+SITE |= TENANT;
+MASTERCATALOG |= TENANT;
+CATALOG |= MASTERCATALOG;
+SHOPPER |= SITE | CATALOG;
+
+module.exports = {
+  scopes: {
+    APP_REQUIRED: APP_REQUIRED,
+    DEVELOPER: DEVELOPER,
+    ADMINUSER: ADMINUSER,
+    SHOPPER: SHOPPER,
+    TENANT: TENANT,
+    SITE: SITE,
+    MASTERCATALOG: MASTERCATALOG,
+    CATALOG: CATALOG,
+    APP_ONLY: APP_ONLY,
+    NONE: NONE
+  },
+  verbs: {
+    GET: 'GET',
+    POST: 'POST',
+    PUT: 'PUT',
+    DELETE: 'DELETE'
+  },
+  headerPrefix: 'x-vol-',
+  headers: {
+    APPCLAIMS: 'app-claims',
+    USERCLAIMS: 'user-claims',
+    TENANT: 'tenant',
+    SITE: 'site',
+    MASTERCATALOG: 'master-catalog',
+    CATALOG: 'catalog',
+    DATAVIEWMODE: 'dataview-mode',
+    VERSION: 'version',
+    SHA256: 'hmac-sha256'
+  },
+  dataViewModes: {
+    LIVE: 'Live',
+    PENDING: 'Pending'
+  },
+  capabilityTimeoutInSeconds: 180,
+  version: version.current
+};
+},{"./version":79}],52:[function(require,module,exports){
+module.exports={
+  "Production/Sandbox": {
+    "homeDomain": "https://home.mozu.com",
+    "paymentServiceTenantPodDomain": "https://pmts.mozu.com",
+    "paymentServiceSandboxDomain": "https://payments-sb.mozu.com"
+  },
+  "Staging": {
+    "homeDomain": "https://home.staging.mozu.com",
+    "paymentServiceTenantPodDomain": "http://services.staging-hp.prod.mozu.com",
+    "paymentServiceSandboxDomain": "http://services.staging-hp.prod.mozu.com"
+  },
+  "QA": {
+    "homeDomain": "https://home.mozu-qa.com",
+    "paymentServiceTenantPodDomain": "https://payments-qa.dev.volusion.com",
+    "paymentServiceSandboxDomain": "https://services-sandbox-mozu-qa.dev.volusion.com"
+  },
+  "SI": {
+    "homeDomain": "https://home.mozu-si.com",
+    "paymentServiceTenantPodDomain": "https://payments.mozu-si.com",
+    "paymentServiceSandboxDomain": "https://payments.mozu-si.com"
+  },
+  "CI": {
+    "homeDomain": "http://aus02ncrprx001.dev.volusion.com",
+    "paymentServiceTenantPodDomain": "http://AUS02NCSERV001.dev.volusion.com",
+    "paymentServiceSandboxDomain": "http://AUS02NCSERV001.dev.volusion.com"
+  }
+}
+
+},{}],53:[function(require,module,exports){
+module.exports = function pctEncode(regexp) {
+  regexp = regexp || /\W/g;
+  return function encode(string) {
+    string = String(string);
+    return string.replace(regexp, function (m) {
+      var c = m[0].charCodeAt(0)
+        , encoded = [];
+      if (c < 128) {
+        encoded.push(c);
+      } else if ((128 <= c && c < 2048)) {
+        encoded.push((c >> 6) | 192);
+        encoded.push((c & 63) | 128);
+      } else {
+        encoded.push((c >> 12) | 224);
+        encoded.push(((c >> 6) & 63) | 128);
+        encoded.push((c & 63) | 128);
+      }
+      return encoded.map(function (c) {
+        return '%' + c.toString(16).toUpperCase();
+      }).join('');
+    })
+  }
+}
+
+},{}],54:[function(require,module,exports){
 module.exports = (function(){
   /*
    * Generated by PEG.js 0.7.0.
@@ -8737,7 +9273,7 @@ module.exports = (function(){
   return result;
 })();
 
-},{"./lib/classes":72}],72:[function(require,module,exports){
+},{"./lib/classes":55}],55:[function(require,module,exports){
 // Generated by CoffeeScript 1.6.3
 (function() {
   var FormContinuationExpression, FormStartExpression, FragmentExpression, LabelExpression, NamedExpression, PathParamExpression, PathSegmentExpression, ReservedExpression, SimpleExpression, Template, encoders, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
@@ -9156,7 +9692,7 @@ module.exports = (function(){
 
 }).call(this);
 
-},{"./encoders":73}],73:[function(require,module,exports){
+},{"./encoders":56}],56:[function(require,module,exports){
 // Generated by CoffeeScript 1.6.3
 (function() {
   var pctEncode;
@@ -9169,1380 +9705,901 @@ module.exports = (function(){
 
 }).call(this);
 
-},{"pct-encode":48}],74:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
+},{"pct-encode":53}],57:[function(require,module,exports){
+'use strict';
 
-var punycode = require('punycode');
+var getUrlTemplate = require('../utils/get-url-template');
+var extend = require('../utils/tiny-extend');
 
-exports.parse = urlParse;
-exports.resolve = urlResolve;
-exports.resolveObject = urlResolveObject;
-exports.format = urlFormat;
-
-exports.Url = Url;
-
-function Url() {
-  this.protocol = null;
-  this.slashes = null;
-  this.auth = null;
-  this.host = null;
-  this.port = null;
-  this.hostname = null;
-  this.hash = null;
-  this.search = null;
-  this.query = null;
-  this.pathname = null;
-  this.path = null;
-  this.href = null;
+function ensureTrailingSlash(url) {
+  return url.charAt(url.length - 1) === '/' ? url : url + '/';
 }
 
-// Reference: RFC 3986, RFC 1808, RFC 2396
-
-// define these here so at least they only have to be
-// compiled once on the first module load.
-var protocolPattern = /^([a-z0-9.+-]+:)/i,
-    portPattern = /:[0-9]*$/,
-
-    // RFC 2396: characters reserved for delimiting URLs.
-    // We actually just auto-escape these.
-    delims = ['<', '>', '"', '`', ' ', '\r', '\n', '\t'],
-
-    // RFC 2396: characters not allowed for various reasons.
-    unwise = ['{', '}', '|', '\\', '^', '`'].concat(delims),
-
-    // Allowed by RFCs, but cause of XSS attacks.  Always escape these.
-    autoEscape = ['\''].concat(unwise),
-    // Characters that are never ever allowed in a hostname.
-    // Note that any invalid chars are also handled, but these
-    // are the ones that are *expected* to be seen, so we fast-path
-    // them.
-    nonHostChars = ['%', '/', '?', ';', '#'].concat(autoEscape),
-    hostEndingChars = ['/', '?', '#'],
-    hostnameMaxLen = 255,
-    hostnamePartPattern = /^[a-z0-9A-Z_-]{0,63}$/,
-    hostnamePartStart = /^([a-z0-9A-Z_-]{0,63})(.*)$/,
-    // protocols that can allow "unsafe" and "unwise" chars.
-    unsafeProtocol = {
-      'javascript': true,
-      'javascript:': true
+/**
+ * Creates, evaluates based on context, and returns a string URL for a Mozu API request.
+ * @param  {Object} context The context of a client. Should have a `baseUrl` property at minimum.
+ * @param  {string} tpt     A string to be compiled into a UriTemplate. Should be a valid UriTemplate.
+ * @param  {Object} body      An object consisting of the JSON body of the request, to be used to interpolate URL paramters.
+ * @return {string}         A fully qualified URL.
+ */
+module.exports = function () {
+  return function (client, tpt, body) {
+    var context = client.context;
+    var template = getUrlTemplate(tpt);
+    var fullTptEvalCtx = extend(
+    // aliases for pod URLs and IDs first
+    {
+      homePod: context.baseUrl,
+      pciPod: context.basePciUrl,
+      tenantId: context.tenant,
+      siteId: context.site,
+      catalogId: context.catalog,
+      masterCatalogId: context['master-catalog']
     },
-    // protocols that never have a hostname.
-    hostlessProtocol = {
-      'javascript': true,
-      'javascript:': true
-    },
-    // protocols that always contain a // bit.
-    slashedProtocol = {
-      'http': true,
-      'https': true,
-      'ftp': true,
-      'gopher': true,
-      'file': true,
-      'http:': true,
-      'https:': true,
-      'ftp:': true,
-      'gopher:': true,
-      'file:': true
-    },
-    querystring = require('querystring');
+    // all context values override those base values if provided
+    context,
+    // any matching values in the body override last.
+    body);
 
-function urlParse(url, parseQueryString, slashesDenoteHost) {
-  if (url && isObject(url) && url instanceof Url) return url;
-
-  var u = new Url;
-  u.parse(url, parseQueryString, slashesDenoteHost);
-  return u;
-}
-
-Url.prototype.parse = function(url, parseQueryString, slashesDenoteHost) {
-  if (!isString(url)) {
-    throw new TypeError("Parameter 'url' must be a string, not " + typeof url);
-  }
-
-  var rest = url;
-
-  // trim before proceeding.
-  // This is to support parse stuff like "  http://foo.com  \n"
-  rest = rest.trim();
-
-  var proto = protocolPattern.exec(rest);
-  if (proto) {
-    proto = proto[0];
-    var lowerProto = proto.toLowerCase();
-    this.protocol = lowerProto;
-    rest = rest.substr(proto.length);
-  }
-
-  // figure out if it's got a host
-  // user@server is *always* interpreted as a hostname, and url
-  // resolution will treat //foo/bar as host=foo,path=bar because that's
-  // how the browser resolves relative URLs.
-  if (slashesDenoteHost || proto || rest.match(/^\/\/[^@\/]+@[^@\/]+/)) {
-    var slashes = rest.substr(0, 2) === '//';
-    if (slashes && !(proto && hostlessProtocol[proto])) {
-      rest = rest.substr(2);
-      this.slashes = true;
-    }
-  }
-
-  if (!hostlessProtocol[proto] &&
-      (slashes || (proto && !slashedProtocol[proto]))) {
-
-    // there's a hostname.
-    // the first instance of /, ?, ;, or # ends the host.
-    //
-    // If there is an @ in the hostname, then non-host chars *are* allowed
-    // to the left of the last @ sign, unless some host-ending character
-    // comes *before* the @-sign.
-    // URLs are obnoxious.
-    //
-    // ex:
-    // http://a@b@c/ => user:a@b host:c
-    // http://a@b?@c => user:a host:c path:/?@c
-
-    // v0.12 TODO(isaacs): This is not quite how Chrome does things.
-    // Review our test case against browsers more comprehensively.
-
-    // find the first instance of any hostEndingChars
-    var hostEnd = -1;
-    for (var i = 0; i < hostEndingChars.length; i++) {
-      var hec = rest.indexOf(hostEndingChars[i]);
-      if (hec !== -1 && (hostEnd === -1 || hec < hostEnd))
-        hostEnd = hec;
-    }
-
-    // at this point, either we have an explicit point where the
-    // auth portion cannot go past, or the last @ char is the decider.
-    var auth, atSign;
-    if (hostEnd === -1) {
-      // atSign can be anywhere.
-      atSign = rest.lastIndexOf('@');
-    } else {
-      // atSign must be in auth portion.
-      // http://a@b/c@d => host:b auth:a path:/c@d
-      atSign = rest.lastIndexOf('@', hostEnd);
-    }
-
-    // Now we have a portion which is definitely the auth.
-    // Pull that off.
-    if (atSign !== -1) {
-      auth = rest.slice(0, atSign);
-      rest = rest.slice(atSign + 1);
-      this.auth = decodeURIComponent(auth);
-    }
-
-    // the host is the remaining to the left of the first non-host char
-    hostEnd = -1;
-    for (var i = 0; i < nonHostChars.length; i++) {
-      var hec = rest.indexOf(nonHostChars[i]);
-      if (hec !== -1 && (hostEnd === -1 || hec < hostEnd))
-        hostEnd = hec;
-    }
-    // if we still have not hit it, then the entire thing is a host.
-    if (hostEnd === -1)
-      hostEnd = rest.length;
-
-    this.host = rest.slice(0, hostEnd);
-    rest = rest.slice(hostEnd);
-
-    // pull out port.
-    this.parseHost();
-
-    // we've indicated that there is a hostname,
-    // so even if it's empty, it has to be present.
-    this.hostname = this.hostname || '';
-
-    // if hostname begins with [ and ends with ]
-    // assume that it's an IPv6 address.
-    var ipv6Hostname = this.hostname[0] === '[' &&
-        this.hostname[this.hostname.length - 1] === ']';
-
-    // validate a little.
-    if (!ipv6Hostname) {
-      var hostparts = this.hostname.split(/\./);
-      for (var i = 0, l = hostparts.length; i < l; i++) {
-        var part = hostparts[i];
-        if (!part) continue;
-        if (!part.match(hostnamePartPattern)) {
-          var newpart = '';
-          for (var j = 0, k = part.length; j < k; j++) {
-            if (part.charCodeAt(j) > 127) {
-              // we replace non-ASCII char with a temporary placeholder
-              // we need this to make sure size of hostname is not
-              // broken by replacing non-ASCII by nothing
-              newpart += 'x';
-            } else {
-              newpart += part[j];
-            }
-          }
-          // we test again with ASCII char only
-          if (!newpart.match(hostnamePartPattern)) {
-            var validParts = hostparts.slice(0, i);
-            var notHost = hostparts.slice(i + 1);
-            var bit = part.match(hostnamePartStart);
-            if (bit) {
-              validParts.push(bit[1]);
-              notHost.unshift(bit[2]);
-            }
-            if (notHost.length) {
-              rest = '/' + notHost.join('.') + rest;
-            }
-            this.hostname = validParts.join('.');
-            break;
-          }
-        }
-      }
-    }
-
-    if (this.hostname.length > hostnameMaxLen) {
-      this.hostname = '';
-    } else {
-      // hostnames are always lower case.
-      this.hostname = this.hostname.toLowerCase();
-    }
-
-    if (!ipv6Hostname) {
-      // IDNA Support: Returns a puny coded representation of "domain".
-      // It only converts the part of the domain name that
-      // has non ASCII characters. I.e. it dosent matter if
-      // you call it with a domain that already is in ASCII.
-      var domainArray = this.hostname.split('.');
-      var newOut = [];
-      for (var i = 0; i < domainArray.length; ++i) {
-        var s = domainArray[i];
-        newOut.push(s.match(/[^A-Za-z0-9_-]/) ?
-            'xn--' + punycode.encode(s) : s);
-      }
-      this.hostname = newOut.join('.');
-    }
-
-    var p = this.port ? ':' + this.port : '';
-    var h = this.hostname || '';
-    this.host = h + p;
-    this.href += this.host;
-
-    // strip [ and ] from the hostname
-    // the host field still retains them, though
-    if (ipv6Hostname) {
-      this.hostname = this.hostname.substr(1, this.hostname.length - 2);
-      if (rest[0] !== '/') {
-        rest = '/' + rest;
-      }
-    }
-  }
-
-  // now rest is set to the post-host stuff.
-  // chop off any delim chars.
-  if (!unsafeProtocol[lowerProto]) {
-
-    // First, make 100% sure that any "autoEscape" chars get
-    // escaped, even if encodeURIComponent doesn't think they
-    // need to be.
-    for (var i = 0, l = autoEscape.length; i < l; i++) {
-      var ae = autoEscape[i];
-      var esc = encodeURIComponent(ae);
-      if (esc === ae) {
-        esc = escape(ae);
-      }
-      rest = rest.split(ae).join(esc);
-    }
-  }
-
-
-  // chop off from the tail first.
-  var hash = rest.indexOf('#');
-  if (hash !== -1) {
-    // got a fragment string.
-    this.hash = rest.substr(hash);
-    rest = rest.slice(0, hash);
-  }
-  var qm = rest.indexOf('?');
-  if (qm !== -1) {
-    this.search = rest.substr(qm);
-    this.query = rest.substr(qm + 1);
-    if (parseQueryString) {
-      this.query = querystring.parse(this.query);
-    }
-    rest = rest.slice(0, qm);
-  } else if (parseQueryString) {
-    // no query string, but parseQueryString still requested
-    this.search = '';
-    this.query = {};
-  }
-  if (rest) this.pathname = rest;
-  if (slashedProtocol[lowerProto] &&
-      this.hostname && !this.pathname) {
-    this.pathname = '/';
-  }
-
-  //to support http.request
-  if (this.pathname || this.search) {
-    var p = this.pathname || '';
-    var s = this.search || '';
-    this.path = p + s;
-  }
-
-  // finally, reconstruct the href based on what has been validated.
-  this.href = this.format();
-  return this;
-};
-
-// format a parsed object into a url string
-function urlFormat(obj) {
-  // ensure it's an object, and not a string url.
-  // If it's an obj, this is a no-op.
-  // this way, you can call url_format() on strings
-  // to clean up potentially wonky urls.
-  if (isString(obj)) obj = urlParse(obj);
-  if (!(obj instanceof Url)) return Url.prototype.format.call(obj);
-  return obj.format();
-}
-
-Url.prototype.format = function() {
-  var auth = this.auth || '';
-  if (auth) {
-    auth = encodeURIComponent(auth);
-    auth = auth.replace(/%3A/i, ':');
-    auth += '@';
-  }
-
-  var protocol = this.protocol || '',
-      pathname = this.pathname || '',
-      hash = this.hash || '',
-      host = false,
-      query = '';
-
-  if (this.host) {
-    host = auth + this.host;
-  } else if (this.hostname) {
-    host = auth + (this.hostname.indexOf(':') === -1 ?
-        this.hostname :
-        '[' + this.hostname + ']');
-    if (this.port) {
-      host += ':' + this.port;
-    }
-  }
-
-  if (this.query &&
-      isObject(this.query) &&
-      Object.keys(this.query).length) {
-    query = querystring.stringify(this.query);
-  }
-
-  var search = this.search || (query && ('?' + query)) || '';
-
-  if (protocol && protocol.substr(-1) !== ':') protocol += ':';
-
-  // only the slashedProtocols get the //.  Not mailto:, xmpp:, etc.
-  // unless they had them to begin with.
-  if (this.slashes ||
-      (!protocol || slashedProtocol[protocol]) && host !== false) {
-    host = '//' + (host || '');
-    if (pathname && pathname.charAt(0) !== '/') pathname = '/' + pathname;
-  } else if (!host) {
-    host = '';
-  }
-
-  if (hash && hash.charAt(0) !== '#') hash = '#' + hash;
-  if (search && search.charAt(0) !== '?') search = '?' + search;
-
-  pathname = pathname.replace(/[?#]/g, function(match) {
-    return encodeURIComponent(match);
-  });
-  search = search.replace('#', '%23');
-
-  return protocol + host + pathname + search + hash;
-};
-
-function urlResolve(source, relative) {
-  return urlParse(source, false, true).resolve(relative);
-}
-
-Url.prototype.resolve = function(relative) {
-  return this.resolveObject(urlParse(relative, false, true)).format();
-};
-
-function urlResolveObject(source, relative) {
-  if (!source) return relative;
-  return urlParse(source, false, true).resolveObject(relative);
-}
-
-Url.prototype.resolveObject = function(relative) {
-  if (isString(relative)) {
-    var rel = new Url();
-    rel.parse(relative, false, true);
-    relative = rel;
-  }
-
-  var result = new Url();
-  Object.keys(this).forEach(function(k) {
-    result[k] = this[k];
-  }, this);
-
-  // hash is always overridden, no matter what.
-  // even href="" will remove it.
-  result.hash = relative.hash;
-
-  // if the relative url is empty, then there's nothing left to do here.
-  if (relative.href === '') {
-    result.href = result.format();
-    return result;
-  }
-
-  // hrefs like //foo/bar always cut to the protocol.
-  if (relative.slashes && !relative.protocol) {
-    // take everything except the protocol from relative
-    Object.keys(relative).forEach(function(k) {
-      if (k !== 'protocol')
-        result[k] = relative[k];
+    // ensure all base URLs have trailing slashes.
+    ['homePod', 'pciPod', 'tenantPod'].forEach(function (x) {
+      if (fullTptEvalCtx[x]) fullTptEvalCtx[x] = ensureTrailingSlash(fullTptEvalCtx[x]);
     });
 
-    //urlParse appends trailing / to urls like http://www.example.com
-    if (slashedProtocol[result.protocol] &&
-        result.hostname && !result.pathname) {
-      result.path = result.pathname = '/';
-    }
+    // don't pass the API version!
+    if (!body || !body.hasOwnProperty("version")) delete fullTptEvalCtx.version;
 
-    result.href = result.format();
-    return result;
-  }
-
-  if (relative.protocol && relative.protocol !== result.protocol) {
-    // if it's a known url protocol, then changing
-    // the protocol does weird things
-    // first, if it's not file:, then we MUST have a host,
-    // and if there was a path
-    // to begin with, then we MUST have a path.
-    // if it is file:, then the host is dropped,
-    // because that's known to be hostless.
-    // anything else is assumed to be absolute.
-    if (!slashedProtocol[relative.protocol]) {
-      Object.keys(relative).forEach(function(k) {
-        result[k] = relative[k];
-      });
-      result.href = result.format();
-      return result;
-    }
-
-    result.protocol = relative.protocol;
-    if (!relative.host && !hostlessProtocol[relative.protocol]) {
-      var relPath = (relative.pathname || '').split('/');
-      while (relPath.length && !(relative.host = relPath.shift()));
-      if (!relative.host) relative.host = '';
-      if (!relative.hostname) relative.hostname = '';
-      if (relPath[0] !== '') relPath.unshift('');
-      if (relPath.length < 2) relPath.unshift('');
-      result.pathname = relPath.join('/');
-    } else {
-      result.pathname = relative.pathname;
-    }
-    result.search = relative.search;
-    result.query = relative.query;
-    result.host = relative.host || '';
-    result.auth = relative.auth;
-    result.hostname = relative.hostname || relative.host;
-    result.port = relative.port;
-    // to support http.request
-    if (result.pathname || result.search) {
-      var p = result.pathname || '';
-      var s = result.search || '';
-      result.path = p + s;
-    }
-    result.slashes = result.slashes || relative.slashes;
-    result.href = result.format();
-    return result;
-  }
-
-  var isSourceAbs = (result.pathname && result.pathname.charAt(0) === '/'),
-      isRelAbs = (
-          relative.host ||
-          relative.pathname && relative.pathname.charAt(0) === '/'
-      ),
-      mustEndAbs = (isRelAbs || isSourceAbs ||
-                    (result.host && relative.pathname)),
-      removeAllDots = mustEndAbs,
-      srcPath = result.pathname && result.pathname.split('/') || [],
-      relPath = relative.pathname && relative.pathname.split('/') || [],
-      psychotic = result.protocol && !slashedProtocol[result.protocol];
-
-  // if the url is a non-slashed url, then relative
-  // links like ../.. should be able
-  // to crawl up to the hostname, as well.  This is strange.
-  // result.protocol has already been set by now.
-  // Later on, put the first path part into the host field.
-  if (psychotic) {
-    result.hostname = '';
-    result.port = null;
-    if (result.host) {
-      if (srcPath[0] === '') srcPath[0] = result.host;
-      else srcPath.unshift(result.host);
-    }
-    result.host = '';
-    if (relative.protocol) {
-      relative.hostname = null;
-      relative.port = null;
-      if (relative.host) {
-        if (relPath[0] === '') relPath[0] = relative.host;
-        else relPath.unshift(relative.host);
-      }
-      relative.host = null;
-    }
-    mustEndAbs = mustEndAbs && (relPath[0] === '' || srcPath[0] === '');
-  }
-
-  if (isRelAbs) {
-    // it's absolute.
-    result.host = (relative.host || relative.host === '') ?
-                  relative.host : result.host;
-    result.hostname = (relative.hostname || relative.hostname === '') ?
-                      relative.hostname : result.hostname;
-    result.search = relative.search;
-    result.query = relative.query;
-    srcPath = relPath;
-    // fall through to the dot-handling below.
-  } else if (relPath.length) {
-    // it's relative
-    // throw away the existing file, and take the new path instead.
-    if (!srcPath) srcPath = [];
-    srcPath.pop();
-    srcPath = srcPath.concat(relPath);
-    result.search = relative.search;
-    result.query = relative.query;
-  } else if (!isNullOrUndefined(relative.search)) {
-    // just pull out the search.
-    // like href='?foo'.
-    // Put this after the other two cases because it simplifies the booleans
-    if (psychotic) {
-      result.hostname = result.host = srcPath.shift();
-      //occationaly the auth can get stuck only in host
-      //this especialy happens in cases like
-      //url.resolveObject('mailto:local1@domain1', 'local2@domain2')
-      var authInHost = result.host && result.host.indexOf('@') > 0 ?
-                       result.host.split('@') : false;
-      if (authInHost) {
-        result.auth = authInHost.shift();
-        result.host = result.hostname = authInHost.shift();
-      }
-    }
-    result.search = relative.search;
-    result.query = relative.query;
-    //to support http.request
-    if (!isNull(result.pathname) || !isNull(result.search)) {
-      result.path = (result.pathname ? result.pathname : '') +
-                    (result.search ? result.search : '');
-    }
-    result.href = result.format();
-    return result;
-  }
-
-  if (!srcPath.length) {
-    // no path at all.  easy.
-    // we've already handled the other stuff above.
-    result.pathname = null;
-    //to support http.request
-    if (result.search) {
-      result.path = '/' + result.search;
-    } else {
-      result.path = null;
-    }
-    result.href = result.format();
-    return result;
-  }
-
-  // if a url ENDs in . or .., then it must get a trailing slash.
-  // however, if it ends in anything else non-slashy,
-  // then it must NOT get a trailing slash.
-  var last = srcPath.slice(-1)[0];
-  var hasTrailingSlash = (
-      (result.host || relative.host) && (last === '.' || last === '..') ||
-      last === '');
-
-  // strip single dots, resolve double dots to parent dir
-  // if the path tries to go above the root, `up` ends up > 0
-  var up = 0;
-  for (var i = srcPath.length; i >= 0; i--) {
-    last = srcPath[i];
-    if (last == '.') {
-      srcPath.splice(i, 1);
-    } else if (last === '..') {
-      srcPath.splice(i, 1);
-      up++;
-    } else if (up) {
-      srcPath.splice(i, 1);
-      up--;
-    }
-  }
-
-  // if the path is allowed to go above the root, restore leading ..s
-  if (!mustEndAbs && !removeAllDots) {
-    for (; up--; up) {
-      srcPath.unshift('..');
-    }
-  }
-
-  if (mustEndAbs && srcPath[0] !== '' &&
-      (!srcPath[0] || srcPath[0].charAt(0) !== '/')) {
-    srcPath.unshift('');
-  }
-
-  if (hasTrailingSlash && (srcPath.join('/').substr(-1) !== '/')) {
-    srcPath.push('');
-  }
-
-  var isAbsolute = srcPath[0] === '' ||
-      (srcPath[0] && srcPath[0].charAt(0) === '/');
-
-  // put the host back
-  if (psychotic) {
-    result.hostname = result.host = isAbsolute ? '' :
-                                    srcPath.length ? srcPath.shift() : '';
-    //occationaly the auth can get stuck only in host
-    //this especialy happens in cases like
-    //url.resolveObject('mailto:local1@domain1', 'local2@domain2')
-    var authInHost = result.host && result.host.indexOf('@') > 0 ?
-                     result.host.split('@') : false;
-    if (authInHost) {
-      result.auth = authInHost.shift();
-      result.host = result.hostname = authInHost.shift();
-    }
-  }
-
-  mustEndAbs = mustEndAbs || (result.host && srcPath.length);
-
-  if (mustEndAbs && !isAbsolute) {
-    srcPath.unshift('');
-  }
-
-  if (!srcPath.length) {
-    result.pathname = null;
-    result.path = null;
-  } else {
-    result.pathname = srcPath.join('/');
-  }
-
-  //to support request.http
-  if (!isNull(result.pathname) || !isNull(result.search)) {
-    result.path = (result.pathname ? result.pathname : '') +
-                  (result.search ? result.search : '');
-  }
-  result.auth = relative.auth || result.auth;
-  result.slashes = result.slashes || relative.slashes;
-  result.href = result.format();
-  return result;
-};
-
-Url.prototype.parseHost = function() {
-  var host = this.host;
-  var port = portPattern.exec(host);
-  if (port) {
-    port = port[0];
-    if (port !== ':') {
-      this.port = port.substr(1);
-    }
-    host = host.substr(0, host.length - port.length);
-  }
-  if (host) this.hostname = host;
-};
-
-function isString(arg) {
-  return typeof arg === "string";
-}
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-
-function isNull(arg) {
-  return arg === null;
-}
-function isNullOrUndefined(arg) {
-  return  arg == null;
-}
-
-},{"punycode":50,"querystring":53}],75:[function(require,module,exports){
-
-/**
- * Module exports.
- */
-
-module.exports = deprecate;
-
-/**
- * Mark that a method should not be used.
- * Returns a modified function which warns once by default.
- *
- * If `localStorage.noDeprecation = true` is set, then it is a no-op.
- *
- * If `localStorage.throwDeprecation = true` is set, then deprecated functions
- * will throw an Error when invoked.
- *
- * If `localStorage.traceDeprecation = true` is set, then deprecated functions
- * will invoke `console.trace()` instead of `console.error()`.
- *
- * @param {Function} fn - the function to deprecate
- * @param {String} msg - the string to print to the console when `fn` is invoked
- * @returns {Function} a new "deprecated" version of `fn`
- * @api public
- */
-
-function deprecate (fn, msg) {
-  if (config('noDeprecation')) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (config('throwDeprecation')) {
-        throw new Error(msg);
-      } else if (config('traceDeprecation')) {
-        console.trace(msg);
-      } else {
-        console.warn(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-}
-
-/**
- * Checks `localStorage` for boolean values for the given `name`.
- *
- * @param {String} name
- * @returns {Boolean}
- * @api private
- */
-
-function config (name) {
-  // accessing global.localStorage can trigger a DOMException in sandboxed iframes
-  try {
-    if (!global.localStorage) return false;
-  } catch (_) {
-    return false;
-  }
-  var val = global.localStorage[name];
-  if (null == val) return false;
-  return String(val).toLowerCase() === 'true';
-}
-
-},{}],76:[function(require,module,exports){
-arguments[4][9][0].apply(exports,arguments)
-},{"dup":9}],77:[function(require,module,exports){
-module.exports = function isBuffer(arg) {
-  return arg && typeof arg === 'object'
-    && typeof arg.copy === 'function'
-    && typeof arg.fill === 'function'
-    && typeof arg.readUInt8 === 'function';
-}
-},{}],78:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-var formatRegExp = /%[sdj%]/g;
-exports.format = function(f) {
-  if (!isString(f)) {
-    var objects = [];
-    for (var i = 0; i < arguments.length; i++) {
-      objects.push(inspect(arguments[i]));
-    }
-    return objects.join(' ');
-  }
-
-  var i = 1;
-  var args = arguments;
-  var len = args.length;
-  var str = String(f).replace(formatRegExp, function(x) {
-    if (x === '%%') return '%';
-    if (i >= len) return x;
-    switch (x) {
-      case '%s': return String(args[i++]);
-      case '%d': return Number(args[i++]);
-      case '%j':
-        try {
-          return JSON.stringify(args[i++]);
-        } catch (_) {
-          return '[Circular]';
-        }
-      default:
-        return x;
-    }
-  });
-  for (var x = args[i]; i < len; x = args[++i]) {
-    if (isNull(x) || !isObject(x)) {
-      str += ' ' + x;
-    } else {
-      str += ' ' + inspect(x);
-    }
-  }
-  return str;
-};
-
-
-// Mark that a method should not be used.
-// Returns a modified function which warns once by default.
-// If --no-deprecation is set, then it is a no-op.
-exports.deprecate = function(fn, msg) {
-  // Allow for deprecating things in the process of starting up.
-  if (isUndefined(global.process)) {
-    return function() {
-      return exports.deprecate(fn, msg).apply(this, arguments);
-    };
-  }
-
-  if (process.noDeprecation === true) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (process.throwDeprecation) {
-        throw new Error(msg);
-      } else if (process.traceDeprecation) {
-        console.trace(msg);
-      } else {
-        console.error(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-};
-
-
-var debugs = {};
-var debugEnviron;
-exports.debuglog = function(set) {
-  if (isUndefined(debugEnviron))
-    debugEnviron = process.env.NODE_DEBUG || '';
-  set = set.toUpperCase();
-  if (!debugs[set]) {
-    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
-      var pid = process.pid;
-      debugs[set] = function() {
-        var msg = exports.format.apply(exports, arguments);
-        console.error('%s %d: %s', set, pid, msg);
-      };
-    } else {
-      debugs[set] = function() {};
-    }
-  }
-  return debugs[set];
-};
-
-
-/**
- * Echos the value of a value. Trys to print the value out
- * in the best way possible given the different types.
- *
- * @param {Object} obj The object to print out.
- * @param {Object} opts Optional options object that alters the output.
- */
-/* legacy: obj, showHidden, depth, colors*/
-function inspect(obj, opts) {
-  // default options
-  var ctx = {
-    seen: [],
-    stylize: stylizeNoColor
+    return template.render(fullTptEvalCtx);
   };
-  // legacy...
-  if (arguments.length >= 3) ctx.depth = arguments[2];
-  if (arguments.length >= 4) ctx.colors = arguments[3];
-  if (isBoolean(opts)) {
-    // legacy...
-    ctx.showHidden = opts;
-  } else if (opts) {
-    // got an "options" object
-    exports._extend(ctx, opts);
-  }
-  // set default options
-  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
-  if (isUndefined(ctx.depth)) ctx.depth = 2;
-  if (isUndefined(ctx.colors)) ctx.colors = false;
-  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
-  if (ctx.colors) ctx.stylize = stylizeWithColor;
-  return formatValue(ctx, obj, ctx.depth);
-}
-exports.inspect = inspect;
-
-
-// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
-inspect.colors = {
-  'bold' : [1, 22],
-  'italic' : [3, 23],
-  'underline' : [4, 24],
-  'inverse' : [7, 27],
-  'white' : [37, 39],
-  'grey' : [90, 39],
-  'black' : [30, 39],
-  'blue' : [34, 39],
-  'cyan' : [36, 39],
-  'green' : [32, 39],
-  'magenta' : [35, 39],
-  'red' : [31, 39],
-  'yellow' : [33, 39]
 };
+},{"../utils/get-url-template":69,"../utils/tiny-extend":77}],58:[function(require,module,exports){
+'use strict';
 
-// Don't use 'blue' not visible on cmd.exe
-inspect.styles = {
-  'special': 'cyan',
-  'number': 'yellow',
-  'boolean': 'yellow',
-  'undefined': 'grey',
-  'null': 'bold',
-  'string': 'green',
-  'date': 'magenta',
-  // "name": intentionally not styling
-  'regexp': 'red'
+var assert = require('assert');
+
+function isExpired(ticket) {
+  var ungraceperiod = 60000;
+  var compareDate = new Date();
+  compareDate.setTime(compareDate.getTime() + ungraceperiod);
+  return new Date(ticket.refreshTokenExpiration) < compareDate;
+}
+
+function generateCacheKey(claimtype, context) {
+  var cmps;
+  if (!process.env.mozuHosted) {
+    assert(context.appKey, "No application key in context!");
+    cmps = [context.appKey];
+  } else {
+    cmps = ['mozuHosted'];
+  }
+  switch (claimtype) {
+    case "developer":
+      assert(context.developerAccount && context.developerAccount.emailAddress, "No developer account email address in context!");
+      cmps.push(context.developerAccount.emailAddress, context.developerAccountId);
+      break;
+    case "admin-user":
+      assert(context.tenant, "No tenant in context!");
+      assert(context.adminUser && context.adminUser.emailAddress, "No admin user email address in context!");
+      cmps.push(context.tenant, context.adminUser.emailAddress);
+      break;
+    default:
+      break;
+  }
+  return cmps.join();
+}
+
+module.exports = function InMemoryAuthCache() {
+  var claimsCaches = {
+    application: {},
+    developer: {},
+    'admin-user': {}
+  };
+
+  return {
+    get: function get(claimtype, context, callback) {
+      var ticket = claimsCaches[claimtype][generateCacheKey(claimtype, context)];
+      setImmediate(function () {
+        callback(null, ticket && !isExpired(ticket) && ticket || undefined);
+      });
+    },
+    set: function set(claimtype, context, ticket, callback) {
+      claimsCaches[claimtype][generateCacheKey(claimtype, context)] = ticket;
+      setImmediate(callback);
+    },
+    constructor: InMemoryAuthCache
+  };
 };
-
-
-function stylizeWithColor(str, styleType) {
-  var style = inspect.styles[styleType];
-
-  if (style) {
-    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-           '\u001b[' + inspect.colors[style][1] + 'm';
-  } else {
-    return str;
-  }
-}
-
-
-function stylizeNoColor(str, styleType) {
-  return str;
-}
-
-
-function arrayToHash(array) {
-  var hash = {};
-
-  array.forEach(function(val, idx) {
-    hash[val] = true;
-  });
-
-  return hash;
-}
-
-
-function formatValue(ctx, value, recurseTimes) {
-  // Provide a hook for user-specified inspect functions.
-  // Check that value is an object with an inspect function on it
-  if (ctx.customInspect &&
-      value &&
-      isFunction(value.inspect) &&
-      // Filter out the util module, it's inspect function is special
-      value.inspect !== exports.inspect &&
-      // Also filter out any prototype objects using the circular check.
-      !(value.constructor && value.constructor.prototype === value)) {
-    var ret = value.inspect(recurseTimes, ctx);
-    if (!isString(ret)) {
-      ret = formatValue(ctx, ret, recurseTimes);
-    }
-    return ret;
-  }
-
-  // Primitive types cannot have properties
-  var primitive = formatPrimitive(ctx, value);
-  if (primitive) {
-    return primitive;
-  }
-
-  // Look up the keys of the object.
-  var keys = Object.keys(value);
-  var visibleKeys = arrayToHash(keys);
-
-  if (ctx.showHidden) {
-    keys = Object.getOwnPropertyNames(value);
-  }
-
-  // IE doesn't make error fields non-enumerable
-  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
-  if (isError(value)
-      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
-    return formatError(value);
-  }
-
-  // Some type of object without properties can be shortcutted.
-  if (keys.length === 0) {
-    if (isFunction(value)) {
-      var name = value.name ? ': ' + value.name : '';
-      return ctx.stylize('[Function' + name + ']', 'special');
-    }
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    }
-    if (isDate(value)) {
-      return ctx.stylize(Date.prototype.toString.call(value), 'date');
-    }
-    if (isError(value)) {
-      return formatError(value);
-    }
-  }
-
-  var base = '', array = false, braces = ['{', '}'];
-
-  // Make Array say that they are Array
-  if (isArray(value)) {
-    array = true;
-    braces = ['[', ']'];
-  }
-
-  // Make functions say that they are functions
-  if (isFunction(value)) {
-    var n = value.name ? ': ' + value.name : '';
-    base = ' [Function' + n + ']';
-  }
-
-  // Make RegExps say that they are RegExps
-  if (isRegExp(value)) {
-    base = ' ' + RegExp.prototype.toString.call(value);
-  }
-
-  // Make dates with properties first say the date
-  if (isDate(value)) {
-    base = ' ' + Date.prototype.toUTCString.call(value);
-  }
-
-  // Make error with message first say the error
-  if (isError(value)) {
-    base = ' ' + formatError(value);
-  }
-
-  if (keys.length === 0 && (!array || value.length == 0)) {
-    return braces[0] + base + braces[1];
-  }
-
-  if (recurseTimes < 0) {
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    } else {
-      return ctx.stylize('[Object]', 'special');
-    }
-  }
-
-  ctx.seen.push(value);
-
-  var output;
-  if (array) {
-    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-  } else {
-    output = keys.map(function(key) {
-      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-    });
-  }
-
-  ctx.seen.pop();
-
-  return reduceToSingleString(output, base, braces);
-}
-
-
-function formatPrimitive(ctx, value) {
-  if (isUndefined(value))
-    return ctx.stylize('undefined', 'undefined');
-  if (isString(value)) {
-    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-                                             .replace(/'/g, "\\'")
-                                             .replace(/\\"/g, '"') + '\'';
-    return ctx.stylize(simple, 'string');
-  }
-  if (isNumber(value))
-    return ctx.stylize('' + value, 'number');
-  if (isBoolean(value))
-    return ctx.stylize('' + value, 'boolean');
-  // For some reason typeof null is "object", so special case here.
-  if (isNull(value))
-    return ctx.stylize('null', 'null');
-}
-
-
-function formatError(value) {
-  return '[' + Error.prototype.toString.call(value) + ']';
-}
-
-
-function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-  var output = [];
-  for (var i = 0, l = value.length; i < l; ++i) {
-    if (hasOwnProperty(value, String(i))) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          String(i), true));
-    } else {
-      output.push('');
-    }
-  }
-  keys.forEach(function(key) {
-    if (!key.match(/^\d+$/)) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          key, true));
-    }
-  });
-  return output;
-}
-
-
-function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-  var name, str, desc;
-  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-  if (desc.get) {
-    if (desc.set) {
-      str = ctx.stylize('[Getter/Setter]', 'special');
-    } else {
-      str = ctx.stylize('[Getter]', 'special');
-    }
-  } else {
-    if (desc.set) {
-      str = ctx.stylize('[Setter]', 'special');
-    }
-  }
-  if (!hasOwnProperty(visibleKeys, key)) {
-    name = '[' + key + ']';
-  }
-  if (!str) {
-    if (ctx.seen.indexOf(desc.value) < 0) {
-      if (isNull(recurseTimes)) {
-        str = formatValue(ctx, desc.value, null);
-      } else {
-        str = formatValue(ctx, desc.value, recurseTimes - 1);
-      }
-      if (str.indexOf('\n') > -1) {
-        if (array) {
-          str = str.split('\n').map(function(line) {
-            return '  ' + line;
-          }).join('\n').substr(2);
-        } else {
-          str = '\n' + str.split('\n').map(function(line) {
-            return '   ' + line;
-          }).join('\n');
-        }
-      }
-    } else {
-      str = ctx.stylize('[Circular]', 'special');
-    }
-  }
-  if (isUndefined(name)) {
-    if (array && key.match(/^\d+$/)) {
-      return str;
-    }
-    name = JSON.stringify('' + key);
-    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-      name = name.substr(1, name.length - 2);
-      name = ctx.stylize(name, 'name');
-    } else {
-      name = name.replace(/'/g, "\\'")
-                 .replace(/\\"/g, '"')
-                 .replace(/(^"|"$)/g, "'");
-      name = ctx.stylize(name, 'string');
-    }
-  }
-
-  return name + ': ' + str;
-}
-
-
-function reduceToSingleString(output, base, braces) {
-  var numLinesEst = 0;
-  var length = output.reduce(function(prev, cur) {
-    numLinesEst++;
-    if (cur.indexOf('\n') >= 0) numLinesEst++;
-    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
-  }, 0);
-
-  if (length > 60) {
-    return braces[0] +
-           (base === '' ? '' : base + '\n ') +
-           ' ' +
-           output.join(',\n  ') +
-           ' ' +
-           braces[1];
-  }
-
-  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
-}
-
-
-// NOTE: These type checking functions intentionally don't use `instanceof`
-// because it is fragile and can be easily faked with `Object.create()`.
-function isArray(ar) {
-  return Array.isArray(ar);
-}
-exports.isArray = isArray;
-
-function isBoolean(arg) {
-  return typeof arg === 'boolean';
-}
-exports.isBoolean = isBoolean;
-
-function isNull(arg) {
-  return arg === null;
-}
-exports.isNull = isNull;
-
-function isNullOrUndefined(arg) {
-  return arg == null;
-}
-exports.isNullOrUndefined = isNullOrUndefined;
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-exports.isNumber = isNumber;
-
-function isString(arg) {
-  return typeof arg === 'string';
-}
-exports.isString = isString;
-
-function isSymbol(arg) {
-  return typeof arg === 'symbol';
-}
-exports.isSymbol = isSymbol;
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
-exports.isUndefined = isUndefined;
-
-function isRegExp(re) {
-  return isObject(re) && objectToString(re) === '[object RegExp]';
-}
-exports.isRegExp = isRegExp;
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-exports.isObject = isObject;
-
-function isDate(d) {
-  return isObject(d) && objectToString(d) === '[object Date]';
-}
-exports.isDate = isDate;
-
-function isError(e) {
-  return isObject(e) &&
-      (objectToString(e) === '[object Error]' || e instanceof Error);
-}
-exports.isError = isError;
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-exports.isFunction = isFunction;
-
-function isPrimitive(arg) {
-  return arg === null ||
-         typeof arg === 'boolean' ||
-         typeof arg === 'number' ||
-         typeof arg === 'string' ||
-         typeof arg === 'symbol' ||  // ES6 symbol
-         typeof arg === 'undefined';
-}
-exports.isPrimitive = isPrimitive;
-
-exports.isBuffer = require('./support/isBuffer');
-
-function objectToString(o) {
-  return Object.prototype.toString.call(o);
-}
-
-
-function pad(n) {
-  return n < 10 ? '0' + n.toString(10) : n.toString(10);
-}
-
-
-var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec'];
-
-// 26 Feb 16:19:34
-function timestamp() {
-  var d = new Date();
-  var time = [pad(d.getHours()),
-              pad(d.getMinutes()),
-              pad(d.getSeconds())].join(':');
-  return [d.getDate(), months[d.getMonth()], time].join(' ');
-}
-
-
-// log is just a thin wrapper to console.log that prepends a timestamp
-exports.log = function() {
-  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
-};
-
+},{"assert":5}],59:[function(require,module,exports){
+'use strict';
+
+var AuthProvider = require('../../security/auth-provider');
+var scopes = require('../../constants').scopes;
+var getScopeFromState = require('./get-scope-from-state');
 
 /**
- * Inherit the prototype methods from one constructor into another.
- *
- * The Function.prototype.inherits from lang.js rewritten as a standalone
- * function (not on Function.prototype). NOTE: If this file is to be loaded
- * during bootstrapping this function needs to be rewritten using some native
- * functions as prototype setup using normal JavaScript does not work as
- * expected during bootstrapping (see mirror.js in r114903).
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
+ * If necessary, add application claims to a client context before
+ * placing a request. Relies on a `scope` parameter to specify.
+ * Uses AuthProvider.
  */
-exports.inherits = require('inherits');
 
-exports._extend = function(origin, add) {
-  // Don't do anything if add isn't an object
-  if (!add || !isObject(add)) return origin;
+module.exports = function (state) {
+  var client = state.client;
 
-  var keys = Object.keys(add);
-  var i = keys.length;
-  while (i--) {
-    origin[keys[i]] = add[keys[i]];
+  var scope = getScopeFromState(state);
+
+  if (scope & scopes.APP_REQUIRED || !(scope & scopes.NONE || scope & scopes.DEVELOPER)) {
+    return AuthProvider.addPlatformAppClaims(client).then(function () {
+      return state;
+    });
+  } else {
+    return state;
   }
-  return origin;
 };
+},{"../../constants":51,"../../security/auth-provider":65,"./get-scope-from-state":63}],60:[function(require,module,exports){
+'use strict';
 
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var TenantCache = require('../../utils/tenant-cache');
+var EnvUrls = require('mozu-metadata/data/environments.json');
+var getUrlTemplate = require('../../utils/get-url-template');
+var getScopeFromState = require('./get-scope-from-state');
+
+/**
+ * If necessary, transforms a promise for a prepared client into a promise
+ * for a client that has a `basePciUrl` in its context.
+ * Reads from the TenantCache if necessary, and consumes mozu-metadata.
+ */
+
+var PCIUrlsByBaseUrl = Object.keys(EnvUrls).reduce(function (o, c) {
+  o[EnvUrls[c].homeDomain] = EnvUrls[c];
+  return o;
+}, {});
+
+module.exports = function (state) {
+  var client = state.client;
+  var requestConfig = state.requestConfig;
+  var url = requestConfig.url;
+
+  if (~getUrlTemplate(url).keysUsed.indexOf('pciPod') && !client.context.basePciUrl && !client.context.pciPod) {
+    var _ret = function () {
+      var tenantId = client.context.tenantId || client.context.tenant;
+      var pciUrls = PCIUrlsByBaseUrl[client.context.baseUrl];
+      if (!tenantId) {
+        throw new Error('Could not place request to ' + url + ' because it requires a tenant ' + 'ID to be set in the client context.');
+      } else if (!pciUrls) {
+        throw new Error('Could not place request to ' + url + ' because it is making a call to ' + 'Payment Service, but there is no known payment service domain ' + ('matching the environment whose base URL is ' + client.context.baseUrl + '.'));
+      } else {
+        return {
+          v: TenantCache.get(tenantId, client, getScopeFromState(state)).then(function (t) {
+            if (t.isDevTenant) {
+              client.context.basePciUrl = pciUrls.paymentServiceSandboxDomain;
+            } else {
+              client.context.basePciUrl = pciUrls.paymentServiceTenantPodDomain;
+            }
+            return state;
+          })
+        };
+      }
+    }();
+
+    if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
+  } else {
+    return state;
+  }
+};
+},{"../../utils/get-url-template":69,"../../utils/tenant-cache":76,"./get-scope-from-state":63,"mozu-metadata/data/environments.json":52}],61:[function(require,module,exports){
+'use strict';
+
+var TenantCache = require('../../utils/tenant-cache');
+var getUrlTemplate = require('../../utils/get-url-template');
+var getScopeFromState = require('./get-scope-from-state');
+
+/**
+ * If necessary, transforms a promise for a prepared client into a promise
+ * for a client that has a `tenantPod` in its context.
+ * Reads from the TenantCache if necessary.
+ */
+
+module.exports = function (state) {
+  var client = state.client;
+  var requestConfig = state.requestConfig;
+  var url = requestConfig.url;
+
+  if (~getUrlTemplate(url).keysUsed.indexOf('tenantPod') && !client.context.tenantPod) {
+    var tenantId = client.context.tenantId || client.context.tenant;
+    if (!tenantId) {
+      throw new Error('Could not place request to ' + url + ' because it requires a tenant ' + 'ID to be set in the client context.');
+    } else {
+      return TenantCache.get(tenantId, client, getScopeFromState(state)).then(function (tenant) {
+        client.context.tenantPod = 'https://' + tenant.domain + '/';
+        return state;
+      });
+    }
+  } else {
+    return state;
+  }
+};
+},{"../../utils/get-url-template":69,"../../utils/tenant-cache":76,"./get-scope-from-state":63}],62:[function(require,module,exports){
+'use strict';
+
+var AuthProvider = require('../../security/auth-provider');
+var scopes = require('../../constants').scopes;
+var getScopeFromState = require('./get-scope-from-state');
+
+/**
+ * If necessary, add developer user claims to a client context before
+ * placing a request. Relies on a `scope` parameter to specify.
+ * Uses AuthProvider.
+ */
+
+module.exports = function (state) {
+  var client = state.client;
+  var scope = getScopeFromState(state);
+
+  if (scope & scopes.DEVELOPER) {
+    return AuthProvider.addDeveloperUserClaims(client).then(function () {
+      return state;
+    });
+  } else if (scope & scopes.ADMINUSER) {
+    return AuthProvider.addAdminUserClaims(client).then(function () {
+      return state;
+    });
+  } else if (!scope && AuthProvider.addMostRecentUserClaims) {
+    return AuthProvider.addMostRecentUserClaims(client).then(function () {
+      return state;
+    });
+  } else {
+    return state;
+  }
+};
+},{"../../constants":51,"../../security/auth-provider":65,"./get-scope-from-state":63}],63:[function(require,module,exports){
+'use strict';
+
+var scopes = require('../../constants').scopes;
+
+/**
+ * From a given prerequisite state object (config, options, requestConfig)
+ * return scope.
+ */
+
+module.exports = function (state) {
+  var requestConfig = state.requestConfig;
+  var options = state.options;
+
+  if (options && options.scope) {
+    if (scopes[options.scope]) {
+      return scopes[options.scope];
+    } else {
+      return options.scope;
+    }
+  } else {
+    return requestConfig.scope;
+  }
+};
+},{"../../constants":51}],64:[function(require,module,exports){
+'use strict';
+/**
+ * Sensible default configuration for a NodeJS, ArcJS, or other server env.
+ * Includes assumptions that you'll have access to Tenant Service, etc.
+ * Not appropriate for shopper or storefront use.
+ */
+
+module.exports = function () {
+  return [require('./ensure-tenant-pod-url'), require('./ensure-pci-pod-url'), require('./ensure-user-claims'), require('./ensure-app-claims')];
+};
+},{"./ensure-app-claims":59,"./ensure-pci-pod-url":60,"./ensure-tenant-pod-url":61,"./ensure-user-claims":62}],65:[function(require,module,exports){
+/* eslint handle-callback-err: 0 */
+/* global Promise */
+'use strict';
+
+var constants = require('../constants'),
+    AuthTicket = require('./auth-ticket'),
+    scopes = constants.scopes;
+
+var TenantCache = require('../utils/tenant-cache');
+
+// if (typeof Promise !== "function") require('when/es6-shim/Promise.browserify-es6');
+
+function createMemoizedClientFactory(clientPath) {
+  var c;
+  return function () {
+    return (c || (c = require(clientPath))).apply(this, arguments);
+  };
 }
 
-},{"./support/isBuffer":77,"inherits":76}]},{},[4])(4)
+var makeAppAuthClient = createMemoizedClientFactory('../clients/platform/applications/authTicket');
+var makeDeveloperAuthClient = createMemoizedClientFactory('../clients/platform/developer/developerAdminUserAuthTicket');
+var makeAdminUserAuthClient = createMemoizedClientFactory('../clients/platform/adminuser/tenantAdminUserAuthTicket');
+
+function cacheDataAndCreateAuthTicket(res) {
+  var tenants = res.availableTenants;
+  if (tenants) {
+    for (var i = 0; i < tenants.length; i++) {
+      TenantCache.add(tenants[i]);
+    }
+  }
+  return new AuthTicket(res);
+}
+
+function getPlatformAuthTicket(client) {
+  return makeAppAuthClient(client).authenticateApp({
+    applicationId: client.context.appKey,
+    sharedSecret: client.context.sharedSecret
+  }, {
+    scope: scopes.NONE
+  }).then(cacheDataAndCreateAuthTicket);
+}
+
+function refreshPlatformAuthTicket(client, ticket) {
+  return makeAppAuthClient(client).refreshAppAuthTicket({
+    refreshToken: ticket.refreshToken
+  }, {
+    scope: scopes.NONE
+  }).then(cacheDataAndCreateAuthTicket);
+}
+
+function getDeveloperAuthTicket(client) {
+  return makeDeveloperAuthClient(client).createDeveloperUserAuthTicket(client.context.developerAccount, {
+    scope: scopes.NONE
+  }).then(cacheDataAndCreateAuthTicket);
+}
+
+function refreshDeveloperAuthTicket(client, ticket) {
+  return makeDeveloperAuthClient(client).refreshDeveloperAuthTicket(ticket, {
+    scope: scopes.NONE
+  }).then(cacheDataAndCreateAuthTicket);
+}
+
+function getAdminUserAuthTicket(client) {
+  return makeAdminUserAuthClient(client).createUserAuthTicket({ tenantId: client.context.tenant }, {
+    body: client.context.adminUser,
+    scope: constants.scopes.APP_ONLY
+  }).then(function (json) {
+    client.context.user = json.user;
+    return cacheDataAndCreateAuthTicket(json);
+  });
+}
+
+function refreshAdminUserAuthTicket(client, ticket) {
+  return makeAdminUserAuthClient(client).refreshAuthTicket(ticket, {
+    scope: constants.scopes.APP_ONLY
+  }).then(cacheDataAndCreateAuthTicket);
+}
+
+var calleeToClaimType = {
+  'addPlatformAppClaims': 'application',
+  'addDeveloperUserClaims': 'developer',
+  'addAdminUserClaims': 'admin-user'
+};
+
+function makeClaimMemoizer(calleeName, requester, refresher, claimHeader) {
+  return function (client) {
+    var cacheAndUpdateClient = function cacheAndUpdateClient(ticket) {
+      return new Promise(function (resolve) {
+        client.authenticationStorage.set(calleeToClaimType[calleeName], client.context, ticket, function () {
+          client.context[claimHeader] = ticket.accessToken;
+          resolve(client);
+        });
+      });
+    };
+    var op = new Promise(function (resolve) {
+      client.authenticationStorage.get(calleeToClaimType[calleeName], client.context, function (err, ticket) {
+        resolve(ticket);
+      });
+    }).then(function (ticket) {
+      if (!ticket) {
+        return requester(client).then(cacheAndUpdateClient);
+      }
+      if (new Date(ticket.accessTokenExpiration) < new Date()) {
+        return refresher(client, ticket).then(cacheAndUpdateClient);
+      }
+      client.context[claimHeader] = ticket.accessToken;
+      return client;
+    });
+    function setRecent() {
+      AuthProvider.addMostRecentUserClaims = AuthProvider[calleeName];
+    }
+    op.then(setRecent, setRecent);
+    return op;
+  };
+}
+
+var AuthProvider = {
+
+  addPlatformAppClaims: makeClaimMemoizer('addPlatformAppClaims', getPlatformAuthTicket, refreshPlatformAuthTicket, constants.headers.APPCLAIMS),
+  addDeveloperUserClaims: makeClaimMemoizer('addDeveloperUserClaims', getDeveloperAuthTicket, refreshDeveloperAuthTicket, constants.headers.USERCLAIMS),
+  addAdminUserClaims: makeClaimMemoizer('addAdminUserClaims', getAdminUserAuthTicket, refreshAdminUserAuthTicket, constants.headers.USERCLAIMS),
+  addMostRecentUserClaims: false
+};
+
+module.exports = AuthProvider;
+},{"../constants":51,"../utils/tenant-cache":76,"./auth-ticket":66}],66:[function(require,module,exports){
+'use strict';
+
+/**
+ * The authentication ticket used to authenticate anything.
+ * @class AuthTicket
+ * @property {string} accessToken The token that stores an encrypted list of the application's configured behaviors and authenticates the application.
+ * @property {Date} accessTokenExpiration Date and time the access token expires. After the access token expires, refresh the authentication ticket using the refresh token.
+ * @property {string} refreshToken The token that refreshes the application's authentication ticket.
+ * @property {Date} refreshTokenExpiration Date and time the refresh token expires. After the refresh token expires, generate a new authentication ticket.
+ */
+
+function AuthTicket(json) {
+  var self = this;
+  if (!(this instanceof AuthTicket)) return new AuthTicket(json);
+  for (var p in json) {
+    if (json.hasOwnProperty(p)) {
+      self[p] = p.indexOf('Expiration') !== -1 ? new Date(json[p]) : json[p]; // dateify the dates, this'll break if the prop name changes
+    }
+  }
+}
+
+module.exports = AuthTicket;
+},{}],67:[function(require,module,exports){
+'use strict';
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var extend = require('./tiny-extend');
+var util = require('util');
+module.exports = function errorify(res, additions) {
+  try {
+    if (typeof res === "string") {
+      return new Error(res);
+    }
+    var err;
+    var message = ensureMessage(res);
+    var stringBody = ensureString(res.body);
+    var details = _typeof(res.body) === "object" ? res.body : (typeof res === 'undefined' ? 'undefined' : _typeof(res)) === "object" ? res : {};
+
+    if (!message && stringBody) {
+      try {
+        details = JSON.parse(stringBody);
+        message = details.message || stringBody;
+      } catch (e) {
+        message = stringBody;
+      }
+    }
+
+    if (additions) {
+      extend(details, additions);
+    }
+
+    message = (message || "Unknown error!") + formatDetails(details);
+
+    err = new Error(message);
+    err.originalError = details;
+    return err;
+  } catch (e) {
+    return e;
+  }
+};
+
+function formatDetails(deets) {
+  return "\n\nDetails:\n" + Object.keys(deets).map(function (label) {
+    var deet = deets[label];
+    if ((typeof deet === 'undefined' ? 'undefined' : _typeof(deet)) === "object") deet = util.inspect(deet);
+    return " " + label + ": " + deet;
+  }).join('\n') + '\n';
+}
+
+function ensureString(something) {
+  if (!something) return String(something);
+  if (typeof something === "string") {
+    return something;
+  }
+  if (Buffer.isBuffer(something)) {
+    return something.toString('utf-8');
+  }
+  if (typeof something.toString === "function") {
+    return something.toString();
+  }
+  return String(something);
+}
+
+function ensureMessage(res) {
+  return res.message || res.body && res.body.message;
+}
+},{"./tiny-extend":77,"util":42}],68:[function(require,module,exports){
+'use strict';
+// BEGIN INIT
+
+var fs = require('fs');
+var findup = require('./tiny-findup');
+
+var legalConfigNames = ['mozu.config', 'mozu.config.json'];
+
+module.exports = function getConfig() {
+  var conf;
+  if (process.env.mozuHosted) {
+    try {
+      conf = JSON.parse(process.env.mozuHosted).sdkConfig;
+    } catch (e) {
+      throw new Error("Mozu hosted configuration was unreadable: " + e.message);
+    }
+  } else {
+    for (var i = legalConfigNames.length - 1; i >= 0; i--) {
+      try {
+        var filename = findup(legalConfigNames[i]);
+        if (filename) conf = fs.readFileSync(filename, 'utf-8');
+      } catch (e) {
+        continue;
+      }
+      if (conf) break;
+    }
+    if (!conf) {
+      throw new Error("No configuration file found. Either create a 'mozu.config' or 'mozu.config.json' file, or supply full config to the .client() method.");
+    }
+    try {
+      conf = JSON.parse(conf);
+    } catch (e) {
+      throw new Error("Configuration file was unreadable: " + e.message);
+    }
+  }
+  return conf;
+};
+},{"./tiny-findup":78,"fs":undefined}],69:[function(require,module,exports){
+'use strict';
+/**
+ * Memoized function to turn URI Template text strings into Template objects.
+ *
+ * Assumes that unescaped URI Template variables are required,
+ * since they're always base URLs in the current codegen.
+ *
+ * @param {String} templateText The URI template string.
+ * @returns {Template} Object with a `render` method and a `keysUsed` object.
+ */
+
+var expRe = /\{.+?\}/g;
+var varnameRe = /[\w_-]+/;
+function findKeys(rawTpt) {
+  var matches = rawTpt.match(expRe);
+  if (!matches) return [];
+  return matches.map(function (x) {
+    return x.match(varnameRe)[0];
+  });
+}
+
+var uritemplate = require('uri-template');
+var cache = {};
+module.exports = function (templateText) {
+  if (cache[templateText]) {
+    return cache[templateText];
+  }
+  var tpt = uritemplate.parse(templateText);
+  return cache[templateText] = {
+    render: function render(x) {
+      return tpt.expand(x);
+    },
+    keysUsed: findKeys(templateText)
+  };
+};
+},{"uri-template":54}],70:[function(require,module,exports){
+'use strict';
+
+var extend = require('./tiny-extend');
+var request = require('./request');
+
+module.exports = function (config) {
+
+  function doRequest(body, options) {
+    options = options || {};
+    var finalRequestConfig = extend({}, config, this.defaultRequestOptions, {
+      url: this.urlResolver(this, config.url, body),
+      context: this.context,
+      body: body
+    }, options);
+    var finalMethod = finalRequestConfig.method && finalRequestConfig.method.toUpperCase();
+
+    // this is magic and was never a good idea.
+    // the way the SDK was designed, the first argument to a method will get
+    // used both as the request payload and as an object to expand the URI
+    // template. this resulted in collisions, and in unexpected behavior with
+    // services that didn't expect strongly typed payloads. the below code
+    // tried to fix it magically, but under certain circumstances it would be
+    // very hard to debug.
+    //
+    // remove any properties from the body that were used to expand the url
+    // if (body && 
+    //     typeof body === "object" &&
+    //     !Array.isArray(body) &&
+    //     !options.body && 
+    //     !options.includeUrlVariablesInPostBody && 
+    //     (finalMethod === "POST" || finalMethod === "PUT")) {
+    //   finalRequestConfig.body = Object.keys(body).reduce(function(m, k) {
+    //     if (!urlSpec.keysUsed[k]) {
+    //       m[k] = body[k];
+    //     }
+    //     return m;
+    //   }, {});
+    //   if (Object.keys(finalRequestConfig.body).length === 0) {
+    //     delete finalRequestConfig.body;
+    //   }
+    // }
+
+
+    if (finalMethod === "GET" || finalMethod === "DELETE" && !options.body) {
+      delete finalRequestConfig.body;
+      // it's outlived its usefulness, we've already made a url with it
+    }
+    return request(finalRequestConfig, this.requestTransform);
+  }
+
+  return function (body, options) {
+    var doThisRequest = doRequest.bind(this, body, options);
+    if (process.env.mozuHosted) {
+      return doThisRequest();
+    } else if (!this.prerequisiteTasks || !Array.isArray(this.prerequisiteTasks)) {
+      return Promise.reject(new Error('Could not place request. No `prerequisiteTasks` array found on ' + 'the client object. To require no auth or URL prerequisites, set ' + '`this.prerequisiteTasks = [];` on the client object.'));
+    } else {
+      return this.prerequisiteTasks.reduce(function (p, t) {
+        return p.then(t);
+      }, Promise.resolve({
+        client: this,
+        options: options,
+        requestConfig: config
+      })).then(doThisRequest);
+    }
+  };
+};
+},{"./request":73,"./tiny-extend":77}],71:[function(require,module,exports){
+'use strict';
+
+var extend = require('./tiny-extend');
+
+var priorities = {
+  'app-claims': ['appClaims'],
+  'user-claims': ['userClaims'],
+  'tenant': ['tenantId'],
+  'site': ['siteId'],
+  'master-catalog': ['masterCatalog', 'masterCatalogId'],
+  'catalog': ['catalogId'],
+  'dataview-mode': ['dataViewMode']
+};
+
+var prioritiesKeys = Object.keys(priorities);
+
+module.exports = function (context) {
+  var newContext = extend({}, context);
+  return prioritiesKeys.reduce(function (ctx, dashKey) {
+    return priorities[dashKey].reduce(function (ctx, k) {
+      if (k in ctx) {
+        ctx[dashKey] = ctx[k];
+        delete ctx[k];
+      }
+      return ctx;
+    }, ctx);
+  }, newContext);
+};
+},{"./tiny-extend":77}],72:[function(require,module,exports){
+'use strict';
+
+var reISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*))(?:Z|(\+|-)([\d|:]*))?$/;
+module.exports = function parseDate(key, value) {
+  return typeof value === 'string' && reISO.exec(value) ? new Date(value) : value;
+};
+},{}],73:[function(require,module,exports){
+'use strict';
+/* global Promise */
+
+var constants = require('../constants');
+var extend = require('./tiny-extend');
+var url = require('url');
+var protocolHandlers = {
+  'http:': require('http'),
+  'https:': require('https')
+};
+var streamToCallback = require('./stream-to-callback');
+var parseJsonDates = require('./parse-json-dates');
+var errorify = require('./errorify');
+
+var USER_AGENT = 'Mozu Node SDK v' + constants.version + ' (Node.js ' + process.version + '; ' + process.platform + ' ' + process.arch + ')';
+
+/**
+ * Handle headers
+ */
+function makeHeaders(conf, payload) {
+  var headers;
+  function iterateHeaders(memo, key) {
+    if (conf.context[constants.headers[key]]) {
+      memo[constants.headerPrefix + constants.headers[key]] = conf.context[constants.headers[key]];
+    }
+    return memo;
+  }
+  if (conf.scope && conf.scope & constants.scopes.NONE) {
+    headers = {};
+  } else if (conf.scope && conf.scope & constants.scopes.APP_ONLY) {
+    headers = ['APPCLAIMS'].reduce(iterateHeaders, {});
+  } else {
+    headers = Object.keys(constants.headers).reduce(iterateHeaders, {});
+  }
+
+  if (payload) {
+    headers['Content-Length'] = payload.length.toString();
+  }
+
+  return extend({
+    'Accept': 'application/json',
+    'Connection': 'close',
+    'Content-Type': 'application/json; charset=utf-8',
+    'User-Agent': USER_AGENT
+  }, headers, conf.headers || {});
+}
+
+/**
+ * Make an HTTP request to the Mozu API. This method populates headers based on the scope of the supplied context.
+ * @param  {Object} options The request options, to be passed to the `request` module. Look up on NPM for details.
+ * @return {Promise<ApiResponse,ApiError>}         A Promise that will fulfill as the JSON response from the API, or reject with an error as JSON from the API.
+ */
+
+module.exports = function (options, transform) {
+  var conf = extend({}, options);
+  conf.method = (conf.method || 'get').toUpperCase();
+  var payload;
+  if (conf.body) {
+    payload = conf.body;
+    if (typeof payload !== "string" && !Buffer.isBuffer(payload)) {
+      payload = JSON.stringify(payload);
+    }
+    if (typeof payload === "string") {
+      payload = new Buffer(payload);
+    }
+  }
+  conf.headers = makeHeaders(conf, payload);
+  var uri = url.parse(conf.url);
+  var protocolHandler = protocolHandlers[uri.protocol];
+  if (!protocolHandler) {
+    throw new Error('Protocol ' + uri.protocol + ' not supported.');
+  }
+  return new Promise(function (resolve, reject) {
+    options = extend({}, options);
+    delete options.headers;
+    var requestOptions = extend({
+      hostname: uri.hostname,
+      port: uri.port || (uri.protocol === 'https:' ? 443 : 80),
+      method: conf.method,
+      path: uri.path,
+      headers: conf.headers,
+      agent: conf.agent
+    }, options);
+    if (typeof transform === "function") {
+      requestOptions = transform(requestOptions);
+    }
+    var complete = false;
+    var request = protocolHandler.request(requestOptions, function (response) {
+      streamToCallback(response, function (err, body) {
+        complete = true;
+        if (err) return reject(errorify(err, extend({ statusCode: response.statusCode, url: response.req.path }, response.headers)));
+        if (body) {
+          try {
+            if (response.headers["content-type"].indexOf('json') > -1 || response.headers["content-type"].indexOf('text/plain') > -1) body = JSON.parse(body, conf.parseDates !== false && parseJsonDates);
+          } catch (e) {
+            return reject(new Error('Response was not valid JSON: ' + e.message + '\n\n-----\n' + body));
+          }
+        }
+        if (response && response.statusCode >= 400 && response.statusCode < 600) {
+          return reject(errorify(body || response, extend({ statusCode: response.statusCode, url: response.req ? response.req.path : "" }, response.headers)));
+        }
+        return resolve(body);
+      });
+    });
+    var timeout = options.timeout || 20000;
+    request.setTimeout(timeout, function () {
+      if (!complete) {
+        request.abort();
+        reject(errorify("Timeout occurred: request to " + conf.url + " took more than " + timeout / 1000 + " seconds to complete."));
+      }
+    });
+    request.on('error', function (err) {
+      reject(errorify(err, request));
+    });
+    if (payload) request.write(payload);
+    request.end();
+  });
+};
+},{"../constants":51,"./errorify":67,"./parse-json-dates":72,"./stream-to-callback":74,"./tiny-extend":77,"http":undefined,"https":undefined,"url":38}],74:[function(require,module,exports){
+'use strict';
+
+var Stream = require('stream').Transform;
+
+module.exports = function streamToCallback(stream, cb) {
+  var buf = new Stream();
+  //stream.setEncoding('utf8');
+  stream.on('data', function (chunk) {
+    buf.push(chunk);
+  });
+  stream.on('error', cb);
+  stream.on('end', function () {
+    cb(null, buf.read());
+  });
+};
+},{"stream":35}],75:[function(require,module,exports){
+'use strict';
+
+var util = require('util'),
+    extend = require('./tiny-extend');
+
+/**
+ * Subclass a constructor. Like Node's `util.inherits` but lets you pass additions to the prototype, and composes constructors.
+ * @param  {Function} cons  The constructor to subclass.
+ * @param  {Object} proto Methods to add to the prototype.
+ * @return {Function}       The new subclass.
+ */
+module.exports = function sub(cons, proto) {
+    var child = function child() {
+        cons.apply(this, arguments);
+    };
+    util.inherits(child, cons);
+    if (proto) extend(child.prototype, proto);
+    return child;
+};
+},{"./tiny-extend":77,"util":42}],76:[function(require,module,exports){
+'use strict';
+
+var TenantClient = void 0;
+var TenantsOrPromisesById = {};
+
+module.exports = {
+  add: function add(tenant) {
+    TenantsOrPromisesById[tenant.id] = tenant;
+  },
+  get: function get(tenantId, client, scope) {
+    TenantClient = TenantClient || require('../clients/platform/tenant');
+    var tenant = TenantsOrPromisesById[tenantId];
+    if (tenant) {
+      // may not be a promise if it was set en masse by AuthProvider.
+      // AuthProvider may set hundreds of tenants at once, so we let it
+      // set them directly for performance reasons.
+      if (typeof tenant.then !== "function") {
+        // and turn them into promises as needed.
+        tenant = TenantsOrPromisesById[tenantId] = Promise.resolve(tenant);
+      }
+      return tenant;
+    } else {
+      return TenantsOrPromisesById[tenantId] = new TenantClient(client).getTenant(null, { scope: scope });
+    }
+  }
+};
+},{"../clients/platform/tenant":49}],77:[function(require,module,exports){
+'use strict';
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+module.exports = function extend(target) {
+  return Array.prototype.slice.call(arguments, 1).reduce(function (out, next) {
+    if (next && (typeof next === "undefined" ? "undefined" : _typeof(next)) === "object") {
+      Object.keys(next).forEach(function (k) {
+        out[k] = next[k];
+      });
+    }
+    return out;
+  }, target);
+};
+},{}],78:[function(require,module,exports){
+'use strict';
+
+var path = require('path');
+var fs = require('fs');
+
+module.exports = function findup(filename) {
+  var maybeFile = path.resolve(filename),
+      dir = process.cwd(),
+      last,
+      exists;
+  while (!(exists = fs.existsSync(maybeFile)) && dir !== last) {
+    maybeFile = path.resolve(dir, '..', filename);
+    last = dir;
+    dir = path.resolve(dir, '..');
+  }
+  return exists && maybeFile;
+};
+},{"fs":undefined,"path":15}],79:[function(require,module,exports){
+'use strict';
+
+module.exports = {
+  current: "1.1705.17038.0"
+};
+},{}]},{},[4])(4)
 });

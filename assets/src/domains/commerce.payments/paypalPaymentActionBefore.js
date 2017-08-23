@@ -65,28 +65,35 @@
 
 var paymentConstants = require("../../paypal/constants");
 var _ = require("underscore");
+var paypal = require('../../paypal/checkout');
 
 module.exports = function(context, callback) {
-
   var payment = context.get.payment();
   if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) callback();
-  var order = context.get.order();
 
-  var existingPayment = _.find(order.payments,
-    function(payment) {
-      return payment.paymentType === paymentConstants.PAYMENTSETTINGID  &&
-            payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID &&
-            payment.status === "Collected";
-    });
+  paypal.getCheckoutSettings(context).then(function(settings) {
+    var order = null;
+    if (settings.isMultishipEnabled)
+      return callback();
 
-  if (existingPayment) {
-    var billingInfo = context.get.payment().billingInfo;
-    billingInfo.externalTransactionId = existingPayment.externalTransactionId;
-    billingInfo.data = existingPayment.data;
-    context.exec.setExternalTransactionId(billingInfo.externalTransactionId);
-    context.exec.setPaymentData("paypal",existingPayment.billingInfo.data.paypal);
-    context.exec.setBillingInfo(billingInfo);
-  }
+    order = context.get.order();
 
-  callback();
+    var existingPayment = _.find(order.payments,
+      function(payment) {
+        return payment.paymentType === paymentConstants.PAYMENTSETTINGID  &&
+              payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID &&
+              payment.status === "Collected";
+      });
+
+    if (existingPayment) {
+      var billingInfo = context.get.payment().billingInfo;
+      billingInfo.externalTransactionId = existingPayment.externalTransactionId;
+      billingInfo.data = existingPayment.data;
+      context.exec.setExternalTransactionId(billingInfo.externalTransactionId);
+      context.exec.setPaymentData("paypal",existingPayment.billingInfo.data.paypal);
+      context.exec.setBillingInfo(billingInfo);
+    }
+
+    callback();
+  });
 };

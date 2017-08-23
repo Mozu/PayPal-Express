@@ -36,5 +36,7 @@
 var paypal = require('../../paypal/checkout');
 
 module.exports = function(context, callback) {
-  paypal.processPayment(context, callback);
+    paypal.getCheckoutSettings(context).then(function(settings){
+      paypal.processPayment(context, callback, settings.isMultishipEnabled );
+    });
 };

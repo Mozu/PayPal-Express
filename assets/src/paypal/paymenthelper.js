@@ -141,9 +141,9 @@ module.exports = {
 	    if (paymentResult.status == paymentConstants.CAPTURED)
 	      context.exec.setPaymentAmountCollected(paymentResult.amount);
   	},
-  	authorizePayment: function (context, config, paymentAction, payment) {
+  	authorizePayment: function (context, config, paymentAction, payment,isMultishipEnabled) {
   		var self = this;
-  		return helper.getOrder(context, payment.orderId, false).then(function(order) {
+  		return helper.getOrder(context, payment.orderId, false,isMultishipEnabled).then(function(order) {
   			var details = helper.getOrderDetails(order,false, paymentAction);
 
         var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
