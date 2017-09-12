@@ -468,7 +468,7 @@ module.exports = {
 	captureAmount: function (context, config, paymentAction, payment) {
   		var self = this;
 		var response = {amount: paymentAction.amount, gatewayResponseCode:  "OK", status: paymentConstants.FAILED};
-
+		
 		return helper.getOrder(context, payment.orderId, false)
 		.then(function(order){
 			if (paymentAction.manualGatewayInteraction) {

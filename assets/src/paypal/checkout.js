@@ -194,6 +194,7 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 			console.log(methods);
 
 			var shippingRates = [];
+			var rateChanged = false;
 			_.each(methods, function(grouping){
 				var existingGroup = _.findWhere(order.groupings,  { id: grouping.groupingId });
 				console.log(existingGroup);
@@ -203,16 +204,30 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 					shippingRate = _.findWhere(grouping.shippingRates, { shippingMethodCode : existingGroup.shippingMethodCode });
 					console.log(shippingRate);
 				}
-				if (!shippingRate)
+				if (shippingRate) {
+					console.log('setting to existing rate');
 					shippingRate =_.min(grouping.shippingRates, function(rate){return rate.price;});
-
-				shippingRates.push({groupingId: grouping.groupingId, shippingRate: shippingRate});
+					console.log(shippingRate.shippingMethodCode , existingGroup.shippingMethodCode);
+					console.log(shippingRate.shippingMethodCode !== existingGroup.shippingMethodCode);
+					if (shippingRate.shippingMethodCode !== existingGroup.shippingMethodCode) {
+						rateChanged = true;
+					}
+				}
+				else {
+					console.log('setting new rate');
+					shippingRates.push({groupingId: grouping.groupingId, shippingRate: shippingRate});
+					rateChanged = true;
+				}
 			});
 			console.log("shipping Rates",shippingRates);
-			return helper.createClientFromContext(Checkout,context).setShippingMethods({checkoutId: order.id}, {body: shippingRates})
-			.then(function(checkout){
-				return checkout;
-			});
+			console.log("shipping Rates changed",rateChanged);
+			if (rateChanged) {
+				return helper.createClientFromContext(Checkout,context).setShippingMethods({checkoutId: order.id}, {body: shippingRates})
+				.then(function(checkout){
+					return checkout;
+				});
+			} else
+				return order;
 
 		});
 	} else {

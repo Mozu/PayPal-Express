@@ -74,9 +74,9 @@ module.exports = function(context, callback) {
  *
  * The `request` and `response` objects are both Streams and you can read
  * data out of them the way that you would in Node.
-
  */
 
+ 
 var paypal = require('../../paypal/checkout');
 var helper = require('../../paypal/helper');
 var Guid = require("easy-guid");
@@ -381,6 +381,7 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 			console.log(methods);
 
 			var shippingRates = [];
+			var rateChanged = false;
 			_.each(methods, function(grouping){
 				var existingGroup = _.findWhere(order.groupings,  { id: grouping.groupingId });
 				console.log(existingGroup);
@@ -390,16 +391,30 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 					shippingRate = _.findWhere(grouping.shippingRates, { shippingMethodCode : existingGroup.shippingMethodCode });
 					console.log(shippingRate);
 				}
-				if (!shippingRate)
+				if (shippingRate) {
+					console.log('setting to existing rate');
 					shippingRate =_.min(grouping.shippingRates, function(rate){return rate.price;});
-
-				shippingRates.push({groupingId: grouping.groupingId, shippingRate: shippingRate});
+					console.log(shippingRate.shippingMethodCode , existingGroup.shippingMethodCode);
+					console.log(shippingRate.shippingMethodCode !== existingGroup.shippingMethodCode);
+					if (shippingRate.shippingMethodCode !== existingGroup.shippingMethodCode) {
+						rateChanged = true;
+					}
+				}
+				else {
+					console.log('setting new rate');
+					shippingRates.push({groupingId: grouping.groupingId, shippingRate: shippingRate});
+					rateChanged = true;
+				}
 			});
-			console.log(shippingRates);
-			return helper.createClientFromContext(Checkout,context).setShippingMethods({checkoutId: order.id}, {body: shippingRates})
-			.then(function(checkout){
-				return checkout;
-			});
+			console.log("shipping Rates",shippingRates);
+			console.log("shipping Rates changed",rateChanged);
+			if (rateChanged) {
+				return helper.createClientFromContext(Checkout,context).setShippingMethods({checkoutId: order.id}, {body: shippingRates})
+				.then(function(checkout){
+					return checkout;
+				});
+			} else
+				return order;
 
 		});
 	} else {
@@ -1098,7 +1113,7 @@ module.exports = {
 	captureAmount: function (context, config, paymentAction, payment) {
   		var self = this;
 		var response = {amount: paymentAction.amount, gatewayResponseCode:  "OK", status: paymentConstants.FAILED};
-
+		
 		return helper.getOrder(context, payment.orderId, false)
 		.then(function(order){
 			if (paymentAction.manualGatewayInteraction) {

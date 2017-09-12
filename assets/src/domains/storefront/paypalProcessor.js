@@ -18,9 +18,9 @@
  *
  * The `request` and `response` objects are both Streams and you can read
  * data out of them the way that you would in Node.
-
  */
 
+ 
 var paypal = require('../../paypal/checkout');
 var helper = require('../../paypal/helper');
 var Guid = require("easy-guid");
