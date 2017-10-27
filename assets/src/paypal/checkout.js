@@ -206,15 +206,11 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 				}
 				if (shippingRate) {
 					console.log('setting to existing rate');
-					shippingRate =_.min(grouping.shippingRates, function(rate){return rate.price;});
-					console.log(shippingRate.shippingMethodCode , existingGroup.shippingMethodCode);
-					console.log(shippingRate.shippingMethodCode !== existingGroup.shippingMethodCode);
-					if (shippingRate.shippingMethodCode !== existingGroup.shippingMethodCode) {
-						rateChanged = true;
-					}
+					shippingRates.push({groupingId: grouping.groupingId, shippingRate: shippingRate});
 				}
 				else {
 					console.log('setting new rate');
+					shippingRate =_.min(grouping.shippingRates, function(rate){return rate.price;});
 					shippingRates.push({groupingId: grouping.groupingId, shippingRate: shippingRate});
 					rateChanged = true;
 				}
