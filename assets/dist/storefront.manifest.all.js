@@ -374,7 +374,7 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo,i
 
 function setShippingMethod(context, order, existingShippingMethodCode, isMultiShipToEnabled) {
 	if (isMultiShipToEnabled) {
-		return helper.createClientFromContext(Checkout,context).getAvailableShipmentMethods({checkoutId: order.id})
+		return helper.createClientFromContext(Checkout,context).getAvailableShippingMethods({checkoutId: order.id})
 		.then(function(methods){
 			if (!methods || methods.length === 0)
 				throw new Error("No Shipping methods found for the selected address");
@@ -2354,7 +2354,7 @@ Node.prototype._encodeValue = function encode(data, reporter, parent) {
 
     if (tag === null) {
       if (state.use === null)
-        reporter.error('Tag could be ommited only for .use()');
+        reporter.error('Tag could be omitted only for .use()');
     } else {
       if (state.use === null)
         result = this._encodeComposite(tag, primitive, cls, content);

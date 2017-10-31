@@ -187,7 +187,7 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo,i
 
 function setShippingMethod(context, order, existingShippingMethodCode, isMultiShipToEnabled) {
 	if (isMultiShipToEnabled) {
-		return helper.createClientFromContext(Checkout,context).getAvailableShipmentMethods({checkoutId: order.id})
+		return helper.createClientFromContext(Checkout,context).getAvailableShippingMethods({checkoutId: order.id})
 		.then(function(methods){
 			if (!methods || methods.length === 0)
 				throw new Error("No Shipping methods found for the selected address");
