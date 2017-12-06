@@ -193,7 +193,7 @@ function voidExistingOrderPayments(data, context, isMultiShipToEnabled) {
 						});
 
 			Promise.all(tasks).then(function(result) {
-				return helper.getOrder(context, data.order.id, isMultiShipToEnabled).then(function(order){
+				return helper.getOrder(context, data.order.id,false, isMultiShipToEnabled).then(function(order){
 					data.order = order;
 					resolve(data);
 				});
@@ -451,7 +451,7 @@ var paypalCheckout = module.exports = {
 		var isCart = queryString.isCart;
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
-		var domain = "https://"+referrer.host;
+		var domain = context.items.siteContext.secureHost;
 		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
 		var redirectUrl = domain+"/paypal/checkout?id="+id+"&isCart="+(isCart ? 1 : 0);
 		var cancelUrl = domain + (isCart ? "/cart" : "/checkout/"+id);
@@ -809,7 +809,7 @@ var helper = module.exports = {
 	getOrderDetails: function(order, includeShipping, paymentAction) {
 		var self = this;
 		var orderDetails = {
-			taxAmount: order.taxTotal,
+			taxAmount: order.taxTotal || (((order.itemTaxTotal + order.shippingTaxTotal + order.handlingTaxTotal+0.00001) * 100) / 100),
 			handlingAmount: order.handlingTotal,
 			shippingAmount: order.shippingSubTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
