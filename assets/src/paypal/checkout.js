@@ -294,19 +294,29 @@ var paypalCheckout = module.exports = {
 		var referrer = helper.parseHref(context);
 		var domain = context.items.siteContext.secureHost;
 		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
-		var redirectUrl = domain+"/paypal/checkout?id="+id+"&isCart="+(isCart ? 1 : 0);
-		var cancelUrl = domain + (isCart ? "/cart" : "/checkout/"+id);
+		var createRedirectUrl = function(isMultiShip) {
+			var url = domain + "/paypal/" + (isMultiShip) ? 'checkoutV2' : 'checkout' + "?id=" + id + "&isCart=" + (isCart ? 1 : 0)
+			if (paramsToPreserve) { url = url + "&" + paramsToPreserve }
+			return url;
+		};
+		var createCancelUrl = function (isMultiShip) {
+			var url = domain + (isCart ? "/cart" : "/" + (isMultiShip) ? 'checkoutV2' : 'checkout' + "/"+id);
+			if (paramsToPreserve) { url = url + (isCart ? "?" : "&") + paramsToPreserve }
+			return url;
+		};
 
-
-		if (paramsToPreserve) {
-			redirectUrl = redirectUrl + "&" + paramsToPreserve;
-			cancelUrl = redirectUrl + (isCart ? "?" : "&") + paramsToPreserve;
-		}
+		var redirectUrl = createRedirectUrl();
+		var cancelUrl = createCancelUrl();
 
 		return paymentHelper.getPaymentConfig(context).then(function(config) {
 			if (!config.enabled) return callback();
 			return self.getCheckoutSettings(context).then(function(settings){
+
+				redirectUrl = createRedirectUrl(settings.isMultishipEnabled);
+				cancelUrl = createCancelUrl(settings.isMultishipEnabled);
+
 				return helper.getOrder(context, id, isCart, settings.isMultishipEnabled).then(function(order) {
+					
 					order.email = getUserEmail(context);
 					console.log(order.email);
 					return {
