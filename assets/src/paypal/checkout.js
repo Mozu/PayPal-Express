@@ -295,7 +295,7 @@ var paypalCheckout = module.exports = {
 		var domain = context.items.siteContext.secureHost;
 		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
 		var createRedirectUrl = function(isMultiShip) {
-			var url = domain + "/paypal/" + (isMultiShip) ? 'checkoutV2' : 'checkout' + "?id=" + id + "&isCart=" + (isCart ? 1 : 0);
+			var url = domain + "/paypal/checkout?id=" + id + "&isCart=" + (isCart ? 1 : 0);
 			if (paramsToPreserve) { url = url + "&" + paramsToPreserve; }
 			return url;
 		};
