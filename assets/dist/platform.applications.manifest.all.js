@@ -412,25 +412,34 @@ var helper = module.exports = {
 		if (includeShipping)
 			orderDetails.email = order.email;
 
+		var contact = null;
+
 		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
+			contact = order.fulfillmentInfo.fulfillmentContact;
+		} else if (order.destinations && order.destinations.length == 1) {
+			var destination = order.destinations[0];
+			contact = destination.destinationContact;
+		}
+
+		if (contact) {
 			orderDetails.shippingAddress = {
-				firstName: order.fulfillmentInfo.fulfillmentContact.firstName,
-				lastName: order.fulfillmentInfo.fulfillmentContact.lastNameOrSurname,
-				address1: order.fulfillmentInfo.fulfillmentContact.address.address1,
-				address2: order.fulfillmentInfo.fulfillmentContact.address.address2,
-				cityOrTown: order.fulfillmentInfo.fulfillmentContact.address.cityOrTown,
-				stateOrProvince: order.fulfillmentInfo.fulfillmentContact.address.stateOrProvince,
-				postalOrZipCode: order.fulfillmentInfo.fulfillmentContact.address.postalOrZipCode,
-				countryCode: order.fulfillmentInfo.fulfillmentContact.address.countryCode,
-				phone: order.fulfillmentInfo.fulfillmentContact.phoneNumbers.home
+				firstName: contact.firstName,
+				lastName: contact.lastNameOrSurname,
+				address1: contact.address.address1,
+				address2: contact.address.address2,
+				cityOrTown: contact.address.cityOrTown,
+				stateOrProvince: contact.address.stateOrProvince,
+				postalOrZipCode: contact.address.postalOrZipCode,
+				countryCode: contact.address.countryCode,
+				phone:contact.phoneNumbers.home
 			};
 		}
 
-    orderDetails.requiresShipping = true;
-    //check if shipping is required
-    var shipItems = _.findWhere(order.items, function(item) { return items.fulfillmentMethod === "ship"; });
-    if (!shipItems)
-      orderDetails.requiresShipping = false;
+		orderDetails.requiresShipping = true;
+		//check if shipping is required
+		var shipItems = _.findWhere(order.items, function(item) { return items.fulfillmentMethod === "ship"; });
+		if (!shipItems)
+			orderDetails.requiresShipping = false;
 
 
 		return orderDetails;
