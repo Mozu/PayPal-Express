@@ -69,14 +69,16 @@ var paypal = require('../../paypal/checkout');
 
 module.exports = function(context, callback) {
   var payment = context.get.payment();
+  console.log(payment);
   if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) callback();
 
-  paypal.getCheckoutSettings(context).then(function(settings) {
-    var order = null;
-    if (settings.isMultishipEnabled)
-      return callback();
+    var isMultishipEnabled = context.get.isForCheckout();
 
-    order = context.get.order();
+    var order = null;
+    //if (isMultishipEnabled)
+    //  return callback();
+
+    order = isMultishipEnabled ? context.get.checkout() : context.get.order();
 
     var existingPayment = _.find(order.payments,
       function(payment) {
@@ -85,7 +87,7 @@ module.exports = function(context, callback) {
               payment.status === "Collected";
       });
 
-    if (existingPayment) {
+    if (existingPayment && payment.paymentWorkflow == existingPayment.paymentWorkflow) {
       var billingInfo = context.get.payment().billingInfo;
       billingInfo.externalTransactionId = existingPayment.externalTransactionId;
       billingInfo.data = existingPayment.data;
@@ -95,5 +97,4 @@ module.exports = function(context, callback) {
     }
 
     callback();
-  });
 };
