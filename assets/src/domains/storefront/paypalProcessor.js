@@ -18,9 +18,9 @@
  *
  * The `request` and `response` objects are both Streams and you can read
  * data out of them the way that you would in Node.
-
  */
 
+ 
 var paypal = require('../../paypal/checkout');
 var helper = require('../../paypal/helper');
 var Guid = require("easy-guid");
@@ -37,31 +37,45 @@ function setError(err, context, errorRedirectUrl ) {
 }
 
 module.exports = function(context, callback) {
-	try {
-		var self = this;
-		var isPaypalCheckout = helper.isPayPalCheckout(context);
-		console.log("is Paypal Checkout", isPaypalCheckout);
-		var queryString = helper.parseUrl(context);
-		var isCart = queryString.isCart == "1";
 
-		var errorRedirectUrl = (isCart ? "/cart" : "/checkout/"+queryString.id);
+	var self = this;
+	var isPaypalCheckout = helper.isPayPalCheckout(context);
+	console.log("is Paypal Checkout", isPaypalCheckout);
+	if (!isPaypalCheckout) return callback();
 
-		if (!isPaypalCheckout) return callback();
-		paypal.checkUserSession(context);
-		console.log("Processing paypal checkout");
-		paypal.process(context, queryString, isCart).then(function(data){
-			var queryStringParams = helper.parseUrl(context);
-			var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
-			var redirectUrl = '/checkout/'+data.id;
-			if (paramsToPreserve)
-				redirectUrl = redirectUrl + "?"+paramsToPreserve;
-			context.response.redirect(redirectUrl);
-    	  	context.response.end();
+	var queryString = helper.parseUrl(context);
+	var isCart = queryString.isCart == "1";
+	var defaultRedirect = "/cart";
 
-		}, function(err) {
+	paypal.checkUserSession(context);
+	console.log("Processing paypal checkout");
+
+	paypal.getCheckoutSettings(context).then(function(settings) {
+		try {
+			var checkoutUrl = '/checkout/';
+			if (settings.isMultishipEnabled)
+				checkoutUrl = "/checkoutV2/";
+
+			var errorRedirectUrl = (isCart ? defaultRedirect : checkoutUrl+queryString.id);
+
+			paypal.process(context, queryString, isCart, settings.isMultishipEnabled).then(function(data){
+				var queryStringParams = helper.parseUrl(context);
+				var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
+				var redirectUrl = checkoutUrl+data.order.id;
+
+				if (paramsToPreserve)
+					redirectUrl = redirectUrl + "?"+paramsToPreserve;
+				console.log(redirectUrl);
+				context.response.redirect(redirectUrl);
+				context.response.end();
+			}).catch(function(err) {
+				setError(err,context, errorRedirectUrl);
+			});
+		} catch(err) {
 			setError(err,context, errorRedirectUrl);
-		});
-	} catch(err) {
-		setError(err,context, errorRedirectUrl);
-	}
+		}
+	 }).catch(function(err){
+		 console.log(err);
+		 setError(err,context, defaultRedirect);
+	 });
 };
