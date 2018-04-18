@@ -160,17 +160,30 @@ var helper = module.exports = {
 		if (includeShipping)
 			orderDetails.email = order.email;
 
+		var contact = null;
+		console.log(order.destinations);
 		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
+			contact = order.fulfillmentInfo.fulfillmentContact;
+		} else if (order.destinations) {
+			var itemDestinations = _.pluck(order.items,"destinationId");
+			itemDestinations = _.uniq(itemDestinations);
+			if (itemDestinations.length == 1) {
+				var destination = _.find(order.destinations, function(destination) { return destination.id == itemDestinations[0];});
+				contact = destination.destinationContact;
+			}
+		}
+
+		if (contact) {
 			orderDetails.shippingAddress = {
-				firstName: order.fulfillmentInfo.fulfillmentContact.firstName,
-				lastName: order.fulfillmentInfo.fulfillmentContact.lastNameOrSurname,
-				address1: order.fulfillmentInfo.fulfillmentContact.address.address1,
-				address2: order.fulfillmentInfo.fulfillmentContact.address.address2,
-				cityOrTown: order.fulfillmentInfo.fulfillmentContact.address.cityOrTown,
-				stateOrProvince: order.fulfillmentInfo.fulfillmentContact.address.stateOrProvince,
-				postalOrZipCode: order.fulfillmentInfo.fulfillmentContact.address.postalOrZipCode,
-				countryCode: order.fulfillmentInfo.fulfillmentContact.address.countryCode,
-				phone: order.fulfillmentInfo.fulfillmentContact.phoneNumbers.home
+				firstName: contact.firstName,
+				lastName: contact.lastNameOrSurname,
+				address1: contact.address.address1,
+				address2: contact.address.address2,
+				cityOrTown: contact.address.cityOrTown,
+				stateOrProvince: contact.address.stateOrProvince,
+				postalOrZipCode: contact.address.postalOrZipCode,
+				countryCode: contact.address.countryCode,
+				phone:contact.phoneNumbers.home
 			};
 		}
 
