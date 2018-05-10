@@ -31,16 +31,18 @@ module.exports = function(context, callback) {
       context.response.body = data;
       context.response.end();
     }, function(err) {
-      console.error(err);
-      context.response.statusCode = 500;
-      context.response.body = err;
-      context.response.end();
-    });  	//paypal.checkUserSession(context);
+      console.log('Error getting token');
+      setError(context, callback, err);
+    });  
   } catch(err) {
-    console.error(err);
-    context.response.statusCode = 500;
-    context.response.body = err;
-    context.response.end();
+    console.log('Catch error');
+    setError(context, callback, err);
   }
-
 };
+
+function setError(context, callback, err){
+  console.error(err);
+  context.response.status = 500;
+  context.response.body = err;
+  callback();
+}

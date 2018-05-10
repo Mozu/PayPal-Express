@@ -289,7 +289,7 @@ var paypalCheckout = module.exports = {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
-		var isCart = queryString.isCart;
+		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
 		var domain = context.items.siteContext.secureHost;
@@ -300,7 +300,7 @@ var paypalCheckout = module.exports = {
 			return url;
 		};
 		var createCancelUrl = function (isMultiShip) {
-			var url = domain + (isCart ? "/cart" : "/" + (isMultiShip) ? 'checkoutV2' : 'checkout' + "/"+id);
+			var url = domain + (isCart ? "/cart" : (isMultiShip) ? '/checkoutV2' : '/checkout' + "/"+id);
 			if (paramsToPreserve) { url = url + (isCart ? "?" : "&") + paramsToPreserve; }
 			return url;
 		};
@@ -428,7 +428,6 @@ var paypalCheckout = module.exports = {
 
 	    console.log("Payment Action", paymentAction);
 		console.log("Payment", payment);
-		console.log("isMultishipEnabled",isMultishipEnabled);
 		
 	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) callback();
 
@@ -444,7 +443,7 @@ var paypalCheckout = module.exports = {
                 return paymentHelper.voidPayment(context, config, paymentAction,payment);
             case "AuthorizePayment":
 				console.log("Authorizing payment for ", payment.externalTransactionId);
-                return paymentHelper.authorizePayment(context,config, paymentAction, payment,isMultishipEnabled);
+                return paymentHelper.authorizePayment(context,config, paymentAction, payment);
             case "CapturePayment":
                 console.log("Capturing payment for ", payment.externalTransactionId);
                 return paymentHelper.captureAmount(context, config, paymentAction, payment);
@@ -453,7 +452,7 @@ var paypalCheckout = module.exports = {
                 return paymentHelper.creditPayment(context, config, paymentAction, payment);
             case "DeclinePayment":
                 console.log("Decline payment for ",payment.externalTransactionId);
-                return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined"};
+                return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
             default:
               return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
           }

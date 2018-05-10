@@ -149,7 +149,7 @@ var helper = module.exports = {
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
 			orderDetails.currencyCode = paymentAction.currencyCode;
-			orderDetails.orderNumber = order.orderNumber;
+			orderDetails.orderNumber = order.orderNumber || order.number;
 		} else {
 			var storeCredits = self.getStoreCredits(order);
 			var storeCreditTotal = _.reduce(storeCredits, function(sum, item) {return sum+item.amount;},0);
@@ -160,31 +160,53 @@ var helper = module.exports = {
 		if (includeShipping)
 			orderDetails.email = order.email;
 
-		if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
-			orderDetails.shippingAddress = {
-				firstName: order.fulfillmentInfo.fulfillmentContact.firstName,
-				lastName: order.fulfillmentInfo.fulfillmentContact.lastNameOrSurname,
-				address1: order.fulfillmentInfo.fulfillmentContact.address.address1,
-				address2: order.fulfillmentInfo.fulfillmentContact.address.address2,
-				cityOrTown: order.fulfillmentInfo.fulfillmentContact.address.cityOrTown,
-				stateOrProvince: order.fulfillmentInfo.fulfillmentContact.address.stateOrProvince,
-				postalOrZipCode: order.fulfillmentInfo.fulfillmentContact.address.postalOrZipCode,
-				countryCode: order.fulfillmentInfo.fulfillmentContact.address.countryCode,
-				phone: order.fulfillmentInfo.fulfillmentContact.phoneNumbers.home
-			};
-		}
+		var hasNonDigital = _.find(order.items, function(item) { return item.fulfillmentMethod !== "Digital";});
 
-    orderDetails.requiresShipping = true;
-    //check if shipping is required
-    var shipItems = _.findWhere(order.items, function(item) { return items.fulfillmentMethod === "ship"; });
-    if (!shipItems)
-      orderDetails.requiresShipping = false;
+		if (hasNonDigital) {
+			var contact = null;
+
+			if (order.fulfillmentInfo  && order.fulfillmentInfo.fulfillmentContact && includeShipping) {
+				contact = order.fulfillmentInfo.fulfillmentContact;
+			}  else if (order.destinations) {
+				var itemDestinations = _.pluck(order.items,"destinationId");
+				itemDestinations = _.uniq(itemDestinations);
+				if (itemDestinations.length == 1) {
+					var destination = _.find(order.destinations, function(destination) { return destination.id == itemDestinations[0];});
+					if (destination)
+						contact = destination.destinationContact;
+				}
+			}
+
+			if (contact) {
+				
+				orderDetails.shippingAddress = {
+					firstName: contact.firstName,
+					lastName: contact.lastNameOrSurname,
+					address1: contact.address.address1,
+					address2: contact.address.address2,
+					cityOrTown: contact.address.cityOrTown,
+					stateOrProvince: contact.address.stateOrProvince,
+					postalOrZipCode: contact.address.postalOrZipCode,
+					countryCode: contact.address.countryCode,
+					phone: (contact.phoneNumbers ? contact.phoneNumbers.home : "")
+				};
+			}
+
+			orderDetails.requiresShipping = true;
+		} else
+			orderDetails.requiresShipping = false;
+
+		//check if shipping is required
+		var shipItems = _.findWhere(order.items, function(item) { return items.fulfillmentMethod === "ship"; });
+		if (!shipItems)
+			orderDetails.requiresShipping = false;
 
 
 		return orderDetails;
 	},
 	getOrder: function(context, id, isCart, isMultiship) {
 		console.log("isMultiShip", isMultiship);
+		console.log("isCart", isCart);
 		if (isCart)
 			return Cart.getCart({cartId: id});
 		else if (!isMultiship)
