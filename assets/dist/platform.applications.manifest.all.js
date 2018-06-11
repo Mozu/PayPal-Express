@@ -396,7 +396,7 @@ var helper = module.exports = {
 		};
 
     	if (order.dutyTotal)
-      		orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
+      		orderDetails.handlingAmount = (((orderDetails.handlingAmount + order.dutyTotal) * 100) / 100);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;

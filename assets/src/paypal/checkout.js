@@ -300,7 +300,7 @@ var paypalCheckout = module.exports = {
 			return url;
 		};
 		var createCancelUrl = function (isMultiShip) {
-			var url = domain + (isCart ? "/cart" : (isMultiShip) ? '/checkoutV2' : '/checkout' + "/"+id);
+			var url = domain + (isCart ? "/cart" : (isMultiShip ? '/checkoutV2' : '/checkout') + "/"+id);
 			if (paramsToPreserve) { url = url + (isCart ? "?" : "&") + paramsToPreserve; }
 			return url;
 		};

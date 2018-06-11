@@ -488,7 +488,7 @@ var paypalCheckout = module.exports = {
 			return url;
 		};
 		var createCancelUrl = function (isMultiShip) {
-			var url = domain + (isCart ? "/cart" : (isMultiShip) ? '/checkoutV2' : '/checkout' + "/"+id);
+			var url = domain + (isCart ? "/cart" : (isMultiShip ? '/checkoutV2' : '/checkout') + "/"+id);
 			if (paramsToPreserve) { url = url + (isCart ? "?" : "&") + paramsToPreserve; }
 			return url;
 		};
@@ -855,7 +855,7 @@ var helper = module.exports = {
 		};
 
     	if (order.dutyTotal)
-      		orderDetails.handlingAmount = parseFloat(order.dutyTotal).toFixed(2);
+      		orderDetails.handlingAmount = (((orderDetails.handlingAmount + order.dutyTotal) * 100) / 100);
 
 		if (paymentAction) {
 			orderDetails.amount = paymentAction.amount;
