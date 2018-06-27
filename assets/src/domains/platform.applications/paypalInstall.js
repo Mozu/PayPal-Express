@@ -18,7 +18,7 @@ function AppInstall(context, callback) {
   self.cb = callback;
 
   self.initialize = function() {
-    console.log(context);
+    console.log("Context",context);
     console.log("Getting tenant", self.ctx.apiContext.tenantId);
     var tenant = context.get.tenant();
     enablePaypalExpressWorkflow(tenant);
@@ -62,6 +62,10 @@ function AppInstall(context, callback) {
           },
           function(err) {
             console.log("custom routes get error", err);
+            if(err.toString().includes('Item not found: settings-general')){        
+              console.log("Site not provisioned properly. Skipping site - ",site.id);
+              return;
+            }        
             return appUpdateCustomRoutes(customRoutesApi, {routes: []});
           }
         );
@@ -78,7 +82,7 @@ function AppInstall(context, callback) {
   }
 
   function appUpdateCustomRoutes(customRoutesApi, customRoutes) {
-     console.log(customRoutes);
+      console.log("CustomRoutes", customRoutes);
       console.log("route array size", _.size(customRoutes.routes));
       //Add / Update custom routes for paypal
       customRoutes = getRoutes(customRoutes, "paypal/token","paypaltoken");
@@ -97,14 +101,18 @@ function AppInstall(context, callback) {
     return paymentSettingsClient.getThirdPartyPaymentWorkflowWithValues({fullyQualifiedName :  paymentDef.namespace+"~"+paymentDef.name })
     .then(function(paymentSettings){
       return updateThirdPartyPaymentWorkflow(paymentSettingsClient, paymentSettings);
-    },function(err) {
+    },function(err) {      
+      if(err.toString().includes('Item not found: settings-checkout')){        
+        console.log("Site not provisioned properly. Skipping site - ",site.id);
+        return;
+      }        
       return paymentSettingsClient.addThirdPartyPaymentWorkflow(paymentDef);
     });
   }
 
   function updateThirdPartyPaymentWorkflow(paymentSettingsClient, existingSettings) {
     var paymentDef = getPaymentDef(existingSettings);
-    console.log(paymentDef);
+    console.log("PaymentDef", paymentDef);
     paymentDef.isEnabled = existingSettings.isEnabled;
     return paymentSettingsClient.deleteThirdPartyPaymentWorkflow({ "fullyQualifiedName" : paymentDef.namespace+"~"+paymentDef.name})
     .then(function(result) {
