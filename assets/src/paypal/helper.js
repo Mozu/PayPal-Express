@@ -137,8 +137,8 @@ var helper = module.exports = {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal || (((order.itemTaxTotal + order.shippingTaxTotal + order.handlingTaxTotal+0.00001) * 100) / 100),
-			handlingAmount: order.handlingTotal,
-			shippingAmount: order.shippingSubTotal,
+			handlingAmount: (order.groupings ? (order.handlingTotal - order.handlingTaxTotal) : order.handlingTotal),
+			shippingAmount:  order.shippingSubTotal,
 			shippingDiscount: self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
 		};
