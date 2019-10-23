@@ -650,7 +650,7 @@ var paypalCheckout = module.exports = {
 				//result = captureResult;
 				actionName = "CapturePayment";
 			}
-			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction);
+			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction, payment);
 			callback();
 		}, callback);
 	},
@@ -966,7 +966,7 @@ module.exports = {
 	validatePaymentSettings: function(context, callback) {
 		var self = this;
 		var paymentSettings = context.request.body;
-		var paypalSettings = _.findWhere(paymentSettings.ExternalPaymentWorkflowDefinitions, {FullyQualifiedName : helper.getPaymentFQN(context)});
+		var paypalSettings = _.findWhere(paymentSettings.externalPaymentWorkflowDefinitions, {fullyQualifiedName : helper.getPaymentFQN(context)});
   		if (!paypalSettings || !paypalSettings.IsEnabled) callback();
 
   		var config = self.getConfig(paypalSettings);
@@ -1009,7 +1009,7 @@ module.exports = {
 
 		return response;
 	},
-	processPaymentResult: function (context,paymentResult, actionName, manualGatewayInteraction) {
+	processPaymentResult: function (context,paymentResult, actionName, manualGatewayInteraction, payment) {
 	    var interactionType = "";
 	    var isManual = false;
 
@@ -1070,7 +1070,7 @@ module.exports = {
 	    interaction.isManual = isManual;
 		
 			console.log("Payment Action result", interaction);
-			
+		payment.interactions.push(interaction);	
 	    context.exec.addPaymentInteraction(interaction);
 
   	},
@@ -1128,7 +1128,7 @@ module.exports = {
 
         if (!authResult.processingFailed) {
     			//Capture payment
-    			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction);
+    			self.processPaymentResult(context,authResult, paymentAction.actionName, paymentAction.manualGatewayInteraction, payment);
         }
 
   			return self.captureAmount(context, config, paymentAction, payment)
@@ -1153,7 +1153,7 @@ module.exports = {
 					console.log("Manual capture...dont send to amazon");
 					response.status = paymentConstants.CAPTURED;
 					response.transactionId = paymentAction.manualGatewayInteraction.gatewayInteractionId;
-					return response;
+					return Promise.resolve(response);
 				}
 
 				var interactions = payment.interactions;
@@ -1165,7 +1165,7 @@ module.exports = {
 				console.log("interactions", interactions);
 				response.responseText = "Authorization Id not found in payment interactions";
 				response.responseCode = 500;
-				return response;
+				return Promise.resolve(response);
 			}
 			var client = self.getPaypalClient(config);
 			var isPartial =  true;
@@ -15365,7 +15365,7 @@ module.exports={
   "_args": [
     [
       "elliptic@6.4.0",
-      "c:\\publicGithub\\PayPal-Express"
+      "C:\\projects\\git\\PayPal-Express"
     ]
   ],
   "_development": true,
@@ -15391,7 +15391,7 @@ module.exports={
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
   "_spec": "6.4.0",
-  "_where": "c:\\publicGithub\\PayPal-Express",
+  "_where": "C:\\projects\\git\\PayPal-Express",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"

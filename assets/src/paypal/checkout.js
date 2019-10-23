@@ -462,7 +462,7 @@ var paypalCheckout = module.exports = {
 				//result = captureResult;
 				actionName = "CapturePayment";
 			}
-			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction);
+			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction, payment);
 			callback();
 		}, callback);
 	},
