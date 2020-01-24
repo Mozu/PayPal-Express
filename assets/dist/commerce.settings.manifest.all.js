@@ -14649,7 +14649,7 @@ module.exports={
   "_args": [
     [
       "elliptic@6.4.0",
-      "C:\\projects\\git\\PayPal-Express"
+      "C:\\Projects\\Public\\PayPal-Express"
     ]
   ],
   "_development": true,
@@ -14675,7 +14675,7 @@ module.exports={
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
   "_spec": "6.4.0",
-  "_where": "C:\\projects\\git\\PayPal-Express",
+  "_where": "C:\\Projects\\Public\\PayPal-Express",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"

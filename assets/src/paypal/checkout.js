@@ -70,17 +70,11 @@ function convertCartToOrder(context, id, isCart, isMultiShip) {
 
 function setFulfillmentInfo(context, order, paypalOrder, isMultiShipToEnabled) {
 	console.log("ship to name",paypalOrder.SHIPTONAME);
-	var parts = paypalOrder.SHIPTONAME.split(/\s+/);
-	console.log("shiptoname",parts);
 	var registeredShopper = getUserEmail(context);
-
-	var firstName = parts[0];
-	var lastName = context.configuration.missingLastNameValue;
-	if (parts[1])
-	lastName = paypalOrder.SHIPTONAME.replace(parts[0]+" ","").replace(parts[0],"");
+	var splitName = getFirstAndLastName(context, paypalOrder.SHIPTONAME);
 	var contact = {
-		"firstName" : firstName,
-		"lastNameOrSurname" : lastName,
+		"firstName" : splitName[0],
+		"lastNameOrSurname" : splitName[1],
 		"email" : registeredShopper || paypalOrder.EMAIL,
 		"phoneNumbers" : {
 			"home" : paypalOrder.SHIPTOPHONENUM || (paypalOrder.PHONENUM || "N/A")
@@ -135,10 +129,10 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo,i
 	var billingContact = {"email" : registeredShopper || paypalOrder.EMAIL};
 
 	if (addBillingInfo && paypalOrder.BILLINGNAME) {
-		var parts = paypalOrder.BILLINGNAME.split(/\s+/g);
+		var splitName = getFirstAndLastName(context, paypalOrder.BILLINGNAME);
 
-		billingContact.firstName  = parts[0];
-		billingContact.lastNameOrSurname = paypalOrder.BILLINGNAME.replace(parts[0]+" ","").replace(parts[0],"");
+		billingContact.firstName  = splitName[0];
+		billingContact.lastNameOrSurname = splitName[1];
 		billingContact.phoneNumbers = {"home" : paypalOrder.PHONENUM || "N/A"};
 		billingContact.address= {
 			"address1": paypalOrder.STREET,
@@ -263,7 +257,22 @@ function getUserEmail(context) {
 	return null;
 }
 
+function getFirstAndLastName(context, fullName) {
+	var fullNameTrimmed = fullName.trim();
+	var nameParts = fullNameTrimmed.split(/\s+/g);
+	var firstName = nameParts[0].trim();
+	var lastName = context.configuration.missingLastNameValue;
 
+	// Treat all but the first part as the last name.
+	// e.g., "Ga Ga" => ["Ga", "Ga"] => "Ga"
+	// e.g., "John Johnson" => ["John", "Johnson"] => "Johnson"
+	// e.g., "Eric Robert Smith" => ["Eric", "Robert", "Smith"] => "Robert Smith"
+	if (nameParts.length > 1) {
+		lastName = nameParts.slice(1, nameParts.length).join(" ").trim();
+	}
+
+	return [firstName, lastName];
+}
 
 var paypalCheckout = module.exports = {
 	getCheckoutSettings: function(context) {
