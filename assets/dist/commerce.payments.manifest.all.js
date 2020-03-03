@@ -418,7 +418,6 @@ function getUserEmail(context) {
 function getFirstAndLastName(context, fullName) {
 	var fullNameTrimmed = fullName.trim();
 	var nameParts = fullNameTrimmed.split(/\s+/g);
-	console.log("nameParts", nameParts);
 	var firstName = nameParts[0].trim();
 	var lastName = context.configuration.missingLastNameValue;
 
@@ -1317,7 +1316,7 @@ Paypal.prototype.setOrderParams = function(order) {
 			params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
 
 		if (order.shippingDiscount)
-			params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);
+			params.PAYMENTREQUEST_0_SHIPDISCAMT = prepareNumber(order.shippingDiscount);
 
 		if (order.items) {
       var itemSum = _.reduce(order.items, function(sum, item) {
@@ -15280,7 +15279,7 @@ module.exports={
   "_args": [
     [
       "elliptic@6.4.0",
-      "C:\\Projects\\Public\\PayPal-Express"
+      "C:\\projects\\PayPal-Express"
     ]
   ],
   "_development": true,
@@ -15306,7 +15305,7 @@ module.exports={
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
   "_spec": "6.4.0",
-  "_where": "C:\\Projects\\Public\\PayPal-Express",
+  "_where": "C:\\projects\\PayPal-Express",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"

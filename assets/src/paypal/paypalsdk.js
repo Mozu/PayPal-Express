@@ -79,7 +79,7 @@ Paypal.prototype.setOrderParams = function(order) {
 			params.PAYMENTREQUEST_0_SHIPPINGAMT = prepareNumber(order.shippingAmount);
 
 		if (order.shippingDiscount)
-			params.PAYMENTREQUEST_n_SHIPDISCAMT = prepareNumber(order.shippingDiscount);
+			params.PAYMENTREQUEST_0_SHIPDISCAMT = prepareNumber(order.shippingDiscount);
 
 		if (order.items) {
       var itemSum = _.reduce(order.items, function(sum, item) {
