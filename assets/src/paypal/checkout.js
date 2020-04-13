@@ -375,11 +375,7 @@ var paypalCheckout = module.exports = {
 			//convert card to order or get existing order
 			return convertCartToOrder(context, id, isCart,isMultiShipToEnabled).then(
 				function(order){
-					var existingShippingMethodCode = order.fulfillmentInfo.shippingMethodCode;
-					if(isMultiShipToEnabled)
-					{
-						existingShippingMethodCode = order.groupings;
-					}
+					var existingShippingMethodCode = isMultiShipToEnabled ? order.groupings: order.fulfillmentInfo.shippingMethodCode;
 					var shipItems = _.filter(order.items,function(item) {return item.fulfillmentMethod === "Ship";});
 					var requiresFulfillmentInfo = false;
 					if (shipItems && shipItems.length > 0)
