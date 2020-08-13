@@ -250,7 +250,7 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 function getUserEmail(context) {
 	var user = context.items.pageContext.user;
 	console.log("user", user);
-	if ( !user.isAnonymous && user.IsAuthenticated ) {
+	if ( !user.isAnonymous && user.isAuthenticated ) {
 		console.log(user);
 		return user.email;
 	}
@@ -284,7 +284,7 @@ var paypalCheckout = module.exports = {
 	checkUserSession: function(context) {
 
 		var user = context.items.pageContext.user;
-		if ( !user.isAnonymous && !user.IsAuthenticated )
+		if ( !user.isAnonymous && !user.isAuthenticated )
 		{
       var allowWarmCheckout = (context.configuration && context.configuration.allowWarmCheckout);
       var redirectUrl = '/user/login?returnUrl=' + encodeURIComponent(context.request.url);
