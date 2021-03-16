@@ -443,29 +443,30 @@ var paypalCheckout = module.exports = {
 		return paymentHelper.getPaymentConfig(context)
 		.then(function(config) {
 			switch(paymentAction.actionName) {
-            case "CreatePayment":
-                console.log("adding new payment interaction for ", paymentAction.externalTransactionId);
-                return paymentHelper.createNewPayment(context, paymentAction);
-            case "VoidPayment":
-                console.log("Voiding payment interaction for ", payment.externalTransactionId);
-                console.log("Void Payment", payment.id);
-                return paymentHelper.voidPayment(context, config, paymentAction,payment);
-            case "AuthorizePayment":
-				console.log("Authorizing payment for ", payment.externalTransactionId);
-                return paymentHelper.authorizePayment(context,config, paymentAction, payment);
-            case "CapturePayment":
-                console.log("Capturing payment for ", payment.externalTransactionId);
-                return paymentHelper.captureAmount(context, config, paymentAction, payment);
-            case "CreditPayment":
-                console.log("Crediting payment for ", payment.externalTransactionId);
-                return paymentHelper.creditPayment(context, config, paymentAction, payment);
-            case "DeclinePayment":
-                console.log("Decline payment for ",payment.externalTransactionId);
-                return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
-            default:
-              return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
-          }
-		}).then(function(result) {
+            	case "CreatePayment":
+            	    console.log("adding new payment interaction for ", paymentAction.externalTransactionId);
+            	    return paymentHelper.createNewPayment(context, paymentAction);
+            	case "VoidPayment":
+            	    console.log("Voiding payment interaction for ", payment.externalTransactionId);
+            	    console.log("Void Payment", payment.id);
+            	    return paymentHelper.voidPayment(context, config, paymentAction,payment);
+            	case "AuthorizePayment":
+					console.log("Authorizing payment for ", payment.externalTransactionId);
+            	    return paymentHelper.authorizePayment(context,config, paymentAction, payment);
+            	case "CapturePayment":
+            	    console.log("Capturing payment for ", payment.externalTransactionId);
+            	    return paymentHelper.captureAmount(context, config, paymentAction, payment);
+            	case "CreditPayment":
+            	    console.log("Crediting payment for ", payment.externalTransactionId);
+            	    return paymentHelper.creditPayment(context, config, paymentAction, payment);
+            	case "DeclinePayment":
+            	    console.log("Decline payment for ",payment.externalTransactionId);
+            	    return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
+            	default:
+              		return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
+          	}
+		})
+		.then(function(result) {
 			var actionName = paymentAction.actionName;
 			if (result.captureOnAuthorize) {
 				//result = captureResult;
@@ -473,37 +474,44 @@ var paypalCheckout = module.exports = {
 			}
 			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction, payment);
 			callback();
-		}, callback);
+		})
+		.catch(function(err){
+			console.log("error:", err);
+			callback();
+		});
 	},
 	addErrorToViewData : function(context, callback) {
 		cache  = context.cache.getOrCreate({type:'distributed', scope:'tenant', level:'shared'});
 		var queryString = helper.parseUrl(context);
 
 		if (queryString.ppErrorId){
-			var paypalError = cache.get("PPE-"+queryString.ppErrorId);
-			if (paypalError) {
-				console.log("Adding paypal error to viewData", paypalError);
-				var message = paypalError;
-				if (paypalError.statusText)
-					message = paypalError.statusText;
-        else if (paypalError.originalError) {
-          console.log("originalError", paypalError.originalError);
-          if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
-            message = paypalError.originalError.items[0].message;
-          else
-           message = paypalError.originalError.message;
-         }
-				else if (paypalError.message){
-					message = paypalError.message;
-					if (message.errorMessage)
-						message = message.errorMessage;
-
-				}
-				else if (paypalError.errorMessage)
-					message = paypalError.errorMessage;
-
-				context.response.viewData.model.messages = [{'message' : message}];
-			}
+			cache.get("PPE-"+queryString.ppErrorId)
+				.then(function(paypalError){				
+					console.log("Adding paypal error to viewData", paypalError);
+					var message = paypalError;
+					if (paypalError.statusText)
+						message = paypalError.statusText;
+					else if (paypalError.originalError) {
+				  		console.log("originalError", paypalError.originalError);
+				  		if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
+							message = paypalError.originalError.items[0].message;
+				  		else
+				   			message = paypalError.originalError.message;
+				 	}
+					else if (paypalError.message){
+						message = paypalError.message;
+						if (message.errorMessage)
+							message = message.errorMessage;	
+					}
+					else if (paypalError.errorMessage)
+						message = paypalError.errorMessage;	
+					context.response.viewData.model.messages = [{'message' : message}];	
+					callback();			
+				})
+				.catch(function(err){
+					console.log("cannot get paypal error from cache:", err);
+					callback();
+				});
 		}
 		callback();
 	}
