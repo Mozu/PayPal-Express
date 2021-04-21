@@ -404,7 +404,13 @@ var paypalCheckout = module.exports = {
 			});
 		}).then(function(response){
 			//set Shipping address
+			console.log("Should update fulfillment ? ", response.requiresFulfillmentInfo ? "Yes": "No");
 			if (!response.requiresFulfillmentInfo) return response;
+
+			// If the order is from a quote, don't update fulfillment info / shipping address on order
+			console.log("Is quote order ? ", response.order.originalQuoteId ? "Yes": "No");
+			if (response.order.originalQuoteId) return response;
+			
 			return setFulfillmentInfo(context, response.order, response.paypalOrder, isMultiShipToEnabled).
 			then(function(fulfillmentInfo) {
 				if (!isMultiShipToEnabled)
