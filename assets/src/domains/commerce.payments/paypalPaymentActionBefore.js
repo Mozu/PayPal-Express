@@ -70,7 +70,7 @@ var paypal = require('../../paypal/checkout');
 module.exports = function(context, callback) {
   var payment = context.get.payment();
   console.log(payment);
-  if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) callback();
+  if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) return callback();
 
     var isMultishipEnabled = context.get.isForCheckout();
 
