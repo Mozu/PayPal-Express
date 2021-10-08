@@ -126,7 +126,7 @@ var paypal = require('../../paypal/checkout');
 module.exports = function(context, callback) {
   var payment = context.get.payment();
   console.log(payment);
-  if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) callback();
+  if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) return callback();
 
     var isMultishipEnabled = context.get.isForCheckout();
 
@@ -408,7 +408,7 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 function getUserEmail(context) {
 	var user = context.items.pageContext.user;
 	console.log("user", user);
-	if ( !user.isAnonymous && user.IsAuthenticated ) {
+	if ( !user.isAnonymous && user.isAuthenticated ) {
 		console.log(user);
 		return user.email;
 	}
@@ -442,7 +442,7 @@ var paypalCheckout = module.exports = {
 	checkUserSession: function(context) {
 
 		var user = context.items.pageContext.user;
-		if ( !user.isAnonymous && !user.IsAuthenticated )
+		if ( !user.isAnonymous && !user.isAuthenticated )
 		{
       var allowWarmCheckout = (context.configuration && context.configuration.allowWarmCheckout);
       var redirectUrl = '/user/login?returnUrl=' + encodeURIComponent(context.request.url);
@@ -533,7 +533,7 @@ var paypalCheckout = module.exports = {
 			//convert card to order or get existing order
 			return convertCartToOrder(context, id, isCart,isMultiShipToEnabled).then(
 				function(order){
-					var existingShippingMethodCode = order.groupings;//order.fulfillmentInfo.shippingMethodCode;
+					var existingShippingMethodCode = isMultiShipToEnabled ? order.groupings: order.fulfillmentInfo.shippingMethodCode;
 					var shipItems = _.filter(order.items,function(item) {return item.fulfillmentMethod === "Ship";});
 					var requiresFulfillmentInfo = false;
 					if (shipItems && shipItems.length > 0)
@@ -562,7 +562,13 @@ var paypalCheckout = module.exports = {
 			});
 		}).then(function(response){
 			//set Shipping address
+			console.log("Should update fulfillment ? ", response.requiresFulfillmentInfo ? "Yes": "No");
 			if (!response.requiresFulfillmentInfo) return response;
+
+			// If the order is from a quote, don't update fulfillment info / shipping address on order
+			console.log("Is quote order ? ", response.order.originalQuoteId ? "Yes": "No");
+			if (response.order.originalQuoteId) return response;
+			
 			return setFulfillmentInfo(context, response.order, response.paypalOrder, isMultiShipToEnabled).
 			then(function(fulfillmentInfo) {
 				if (!isMultiShipToEnabled)
@@ -596,34 +602,35 @@ var paypalCheckout = module.exports = {
 	    console.log("Payment Action", paymentAction);
 		console.log("Payment", payment);
 		
-	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) callback();
+	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) return callback();
 
 		return paymentHelper.getPaymentConfig(context)
 		.then(function(config) {
 			switch(paymentAction.actionName) {
-            case "CreatePayment":
-                console.log("adding new payment interaction for ", paymentAction.externalTransactionId);
-                return paymentHelper.createNewPayment(context, paymentAction);
-            case "VoidPayment":
-                console.log("Voiding payment interaction for ", payment.externalTransactionId);
-                console.log("Void Payment", payment.id);
-                return paymentHelper.voidPayment(context, config, paymentAction,payment);
-            case "AuthorizePayment":
-				console.log("Authorizing payment for ", payment.externalTransactionId);
-                return paymentHelper.authorizePayment(context,config, paymentAction, payment);
-            case "CapturePayment":
-                console.log("Capturing payment for ", payment.externalTransactionId);
-                return paymentHelper.captureAmount(context, config, paymentAction, payment);
-            case "CreditPayment":
-                console.log("Crediting payment for ", payment.externalTransactionId);
-                return paymentHelper.creditPayment(context, config, paymentAction, payment);
-            case "DeclinePayment":
-                console.log("Decline payment for ",payment.externalTransactionId);
-                return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
-            default:
-              return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
-          }
-		}).then(function(result) {
+            	case "CreatePayment":
+            	    console.log("adding new payment interaction for ", paymentAction.externalTransactionId);
+            	    return paymentHelper.createNewPayment(context, paymentAction);
+            	case "VoidPayment":
+            	    console.log("Voiding payment interaction for ", payment.externalTransactionId);
+            	    console.log("Void Payment", payment.id);
+            	    return paymentHelper.voidPayment(context, config, paymentAction,payment);
+            	case "AuthorizePayment":
+					console.log("Authorizing payment for ", payment.externalTransactionId);
+            	    return paymentHelper.authorizePayment(context,config, paymentAction, payment);
+            	case "CapturePayment":
+            	    console.log("Capturing payment for ", payment.externalTransactionId);
+            	    return paymentHelper.captureAmount(context, config, paymentAction, payment);
+            	case "CreditPayment":
+            	    console.log("Crediting payment for ", payment.externalTransactionId);
+            	    return paymentHelper.creditPayment(context, config, paymentAction, payment);
+            	case "DeclinePayment":
+            	    console.log("Decline payment for ",payment.externalTransactionId);
+            	    return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
+            	default:
+              		return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
+          	}
+		})
+		.then(function(result) {
 			var actionName = paymentAction.actionName;
 			if (result.captureOnAuthorize) {
 				//result = captureResult;
@@ -631,37 +638,44 @@ var paypalCheckout = module.exports = {
 			}
 			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction, payment);
 			callback();
-		}, callback);
+		})
+		.catch(function(err){
+			console.log("error:", err);
+			callback();
+		});
 	},
 	addErrorToViewData : function(context, callback) {
 		cache  = context.cache.getOrCreate({type:'distributed', scope:'tenant', level:'shared'});
 		var queryString = helper.parseUrl(context);
 
 		if (queryString.ppErrorId){
-			var paypalError = cache.get("PPE-"+queryString.ppErrorId);
-			if (paypalError) {
-				console.log("Adding paypal error to viewData", paypalError);
-				var message = paypalError;
-				if (paypalError.statusText)
-					message = paypalError.statusText;
-        else if (paypalError.originalError) {
-          console.log("originalError", paypalError.originalError);
-          if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
-            message = paypalError.originalError.items[0].message;
-          else
-           message = paypalError.originalError.message;
-         }
-				else if (paypalError.message){
-					message = paypalError.message;
-					if (message.errorMessage)
-						message = message.errorMessage;
-
-				}
-				else if (paypalError.errorMessage)
-					message = paypalError.errorMessage;
-
-				context.response.viewData.model.messages = [{'message' : message}];
-			}
+			cache.get("PPE-"+queryString.ppErrorId)
+				.then(function(paypalError){				
+					console.log("Adding paypal error to viewData", paypalError);
+					var message = paypalError;
+					if (paypalError.statusText)
+						message = paypalError.statusText;
+					else if (paypalError.originalError) {
+				  		console.log("originalError", paypalError.originalError);
+				  		if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
+							message = paypalError.originalError.items[0].message;
+				  		else
+				   			message = paypalError.originalError.message;
+				 	}
+					else if (paypalError.message){
+						message = paypalError.message;
+						if (message.errorMessage)
+							message = message.errorMessage;	
+					}
+					else if (paypalError.errorMessage)
+						message = paypalError.errorMessage;	
+					context.response.viewData.model.messages = [{'message' : message}];	
+					callback();			
+				})
+				.catch(function(err){
+					console.log("cannot get paypal error from cache:", err);
+					callback();
+				});
 		}
 		callback();
 	}
@@ -1537,14 +1551,21 @@ Paypal.prototype.request = function( params) {
 		var encodedParams = querystring.stringify(params);
 		needle.post(self.url,
 			encodedParams,
-			{json: false, parse: true,open_timeout: 60000},
+			{
+				json: false, 
+				parse: true,
+				headers: {
+					'Accept-Encoding': 'identity'
+				},
+				open_timeout: 60000
+			},
 			function(err, response, body) {
 				if (response.statusCode != 200){
 					console.log("Paypal express Error", response);
 					reject({statusCode : response.StatusCode, data: err});
 				}
 				else {
-					var data = querystring.parse(body);
+					var data = querystring.parse((body||'').toString());  //call to string in case of weird NVP content type header will force the buffer to get utf8 encoded.
 					if (data.ACK !== 'Success') {
 						console.log("Paypal express error", data);
 						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0,
@@ -15279,7 +15300,7 @@ module.exports={
   "_args": [
     [
       "elliptic@6.4.0",
-      "C:\\projects\\PayPal-Express"
+      "/Users/thomphipps/git/PayPal-Express"
     ]
   ],
   "_development": true,
@@ -15305,7 +15326,7 @@ module.exports={
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
   "_spec": "6.4.0",
-  "_where": "C:\\projects\\PayPal-Express",
+  "_where": "/Users/thomphipps/git/PayPal-Express",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"

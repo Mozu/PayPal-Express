@@ -300,14 +300,21 @@ Paypal.prototype.request = function( params) {
 		var encodedParams = querystring.stringify(params);
 		needle.post(self.url,
 			encodedParams,
-			{json: false, parse: true,open_timeout: 60000},
+			{
+				json: false, 
+				parse: true,
+				headers: {
+					'Accept-Encoding': 'identity'
+				},
+				open_timeout: 60000
+			},
 			function(err, response, body) {
 				if (response.statusCode != 200){
 					console.log("Paypal express Error", response);
 					reject({statusCode : response.StatusCode, data: err});
 				}
 				else {
-					var data = querystring.parse(body);
+					var data = querystring.parse((body||'').toString());  //call to string in case of weird NVP content type header will force the buffer to get utf8 encoded.
 					if (data.ACK !== 'Success') {
 						console.log("Paypal express error", data);
 						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0,

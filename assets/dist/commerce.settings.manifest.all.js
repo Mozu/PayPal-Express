@@ -907,14 +907,21 @@ Paypal.prototype.request = function( params) {
 		var encodedParams = querystring.stringify(params);
 		needle.post(self.url,
 			encodedParams,
-			{json: false, parse: true,open_timeout: 60000},
+			{
+				json: false, 
+				parse: true,
+				headers: {
+					'Accept-Encoding': 'identity'
+				},
+				open_timeout: 60000
+			},
 			function(err, response, body) {
 				if (response.statusCode != 200){
 					console.log("Paypal express Error", response);
 					reject({statusCode : response.StatusCode, data: err});
 				}
 				else {
-					var data = querystring.parse(body);
+					var data = querystring.parse((body||'').toString());  //call to string in case of weird NVP content type header will force the buffer to get utf8 encoded.
 					if (data.ACK !== 'Success') {
 						console.log("Paypal express error", data);
 						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0,
@@ -14649,7 +14656,7 @@ module.exports={
   "_args": [
     [
       "elliptic@6.4.0",
-      "C:\\projects\\PayPal-Express"
+      "/Users/thomphipps/git/PayPal-Express"
     ]
   ],
   "_development": true,
@@ -14675,7 +14682,7 @@ module.exports={
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
   "_spec": "6.4.0",
-  "_where": "C:\\projects\\PayPal-Express",
+  "_where": "/Users/thomphipps/git/PayPal-Express",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"
