@@ -314,6 +314,8 @@ Paypal.prototype.request = function( params) {
 					reject({statusCode : response.StatusCode, data: err});
 				}
 				else {
+					console.log("response headers:",response.headers);
+					console.log("response body", body);
 					var data = querystring.parse((body||'').toString());  //call to string in case of weird NVP content type header will force the buffer to get utf8 encoded.
 					if (data.ACK !== 'Success') {
 						console.log("Paypal express error", data);

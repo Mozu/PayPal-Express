@@ -442,7 +442,7 @@ var paypalCheckout = module.exports = {
 	    var payment = context.get.payment();
 
 	    console.log("Payment Action", paymentAction);
-		console.log("Payment", payment);
+		//console.log("Payment", payment);
 		
 	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) return callback();
 
