@@ -242,7 +242,7 @@ module.exports = {
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
 
-			return client.doCapture(payment.externalTransactionId,order.orderNumber,
+    return client.doCapture(payment.externalTransactionId, paymentAuthorizationInteraction.target.targetNumber,
 						paymentAuthorizationInteraction.gatewayTransactionId,
 						paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function(captureResult){
