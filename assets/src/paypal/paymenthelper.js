@@ -240,9 +240,12 @@ module.exports = {
 			var client = self.getPaypalClient(config);
 			var isPartial =  true;
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
-			paymentAction.amount = context.configuration.paypal.capture.amount;
+      paymentAction.amount = context.configuration.paypal.capture.amount;
 
-    return client.doCapture(payment.externalTransactionId, paymentAuthorizationInteraction.target.targetNumber,
+      //Using interaction target field to prefer sending checkout number for multiship order.In case of multiship, authorization always happens at checkout level
+      var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
+
+      return client.doCapture(payment.externalTransactionId, number,
 						paymentAuthorizationInteraction.gatewayTransactionId,
 						paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function(captureResult){
