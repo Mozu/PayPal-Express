@@ -150,7 +150,7 @@ module.exports = {
 			console.log('is for checkout', isMultishipEnabled);
 			var order = isMultishipEnabled ? context.get.checkout() : context.get.order();
 
-			var details = helper.getOrderDetails(order,false, paymentAction);
+			var details = helper.getOrderDetails(order, false, paymentAction, isMultishipEnabled);
 
 			var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
 			var existingAuthorized = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized";   });

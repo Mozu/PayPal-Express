@@ -330,7 +330,7 @@ var paypalCheckout = module.exports = {
 					console.log(order.email);
 					return {
 						config: config,
-						order: helper.getOrderDetails(order,true )
+						order: helper.getOrderDetails(order, true, null, settings.isMultishipEnabled)
 					};
 	
 				});
