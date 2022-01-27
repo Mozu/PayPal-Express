@@ -76,6 +76,16 @@ var helper = module.exports = {
 		  c.context[constants.headers.USERCLAIMS] = null;
 	  return c;
 	},
+	getUrlPrefix: function(context){
+		//default prefix to siteSubdirectory 
+		var prefix = context.items.siteContext.siteSubdirectory || '';
+		var config = (context.configuration || {}).subdirectories;
+		//allow override of prefix from config
+		if(config && config[context.apiContext.siteId]){
+			prefix = config[context.apiContext.siteId];
+		}
+		return prefix;
+	},
 	isTokenRequest: function(context) {
 		 return context.request.url.indexOf("/paypal/token") > -1;
 	},
@@ -193,13 +203,13 @@ var helper = module.exports = {
 		var items = this.getActiveDiscountItems(order.shippingDiscounts);
 		return _.reduce(items, function(sum, item) {return sum+item.amount;},0);
 	},
-	getOrderDetails: function(order, includeShipping, paymentAction) {
+	getOrderDetails: function(order, includeShipping, paymentAction, isMultishipEnabled) {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal || (((order.itemTaxTotal + order.shippingTaxTotal + order.handlingTaxTotal+0.00001) * 100) / 100),
 			handlingAmount: (order.groupings ? (order.handlingTotal - order.handlingTaxTotal) : order.handlingTotal),
-			shippingAmount:  order.shippingSubTotal,
-			shippingDiscount: self.getShippingDiscountAmount(order),
+			shippingAmount: isMultishipEnabled ? (order.shippingSubTotal - order.itemLevelShippingDiscountTotal) : order.shippingSubTotal,
+			shippingDiscount: isMultishipEnabled ? order.orderLevelShippingDiscountTotal : self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
 		};
 
@@ -429,7 +439,7 @@ module.exports = {
 			console.log('is for checkout', isMultishipEnabled);
 			var order = isMultishipEnabled ? context.get.checkout() : context.get.order();
 
-			var details = helper.getOrderDetails(order,false, paymentAction);
+			var details = helper.getOrderDetails(order, false, paymentAction, isMultishipEnabled);
 
 			var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
 			var existingAuthorized = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized";   });
@@ -519,9 +529,12 @@ module.exports = {
 			var client = self.getPaypalClient(config);
 			var isPartial =  true;
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
-			paymentAction.amount = context.configuration.paypal.capture.amount;
+      paymentAction.amount = context.configuration.paypal.capture.amount;
 
-			return client.doCapture(payment.externalTransactionId,order.orderNumber,
+      //Using interaction target field to prefer sending checkout number for multiship order.In case of multiship, authorization always happens at checkout level
+      var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
+
+      return client.doCapture(payment.externalTransactionId, number,
 						paymentAuthorizationInteraction.gatewayTransactionId,
 						paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function(captureResult){
@@ -14646,53 +14659,37 @@ utils.intFromLE = intFromLE;
 
 },{"bn.js":22,"minimalistic-assert":133,"minimalistic-crypto-utils":134}],90:[function(require,module,exports){
 module.exports={
-  "_args": [
-    [
-      "elliptic@6.4.0",
-      "C:\\projects\\PayPal-Express"
-    ]
+  "name": "elliptic",
+  "version": "6.4.0",
+  "description": "EC cryptography",
+  "main": "lib/elliptic.js",
+  "files": [
+    "lib"
   ],
-  "_development": true,
-  "_from": "elliptic@6.4.0",
-  "_id": "elliptic@6.4.0",
-  "_inBundle": false,
-  "_integrity": "sha1-ysmvh2LIWDYYcAPI3+GT5eLq5d8=",
-  "_location": "/elliptic",
-  "_phantomChildren": {},
-  "_requested": {
-    "type": "version",
-    "registry": true,
-    "raw": "elliptic@6.4.0",
-    "name": "elliptic",
-    "escapedName": "elliptic",
-    "rawSpec": "6.4.0",
-    "saveSpec": null,
-    "fetchSpec": "6.4.0"
+  "scripts": {
+    "jscs": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
+    "jshint": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
+    "lint": "npm run jscs && npm run jshint",
+    "unit": "istanbul test _mocha --reporter=spec test/index.js",
+    "test": "npm run lint && npm run unit",
+    "version": "grunt dist && git add dist/"
   },
-  "_requiredBy": [
-    "/browserify-sign",
-    "/create-ecdh"
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:indutny/elliptic"
+  },
+  "keywords": [
+    "EC",
+    "Elliptic",
+    "curve",
+    "Cryptography"
   ],
-  "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
-  "_spec": "6.4.0",
-  "_where": "C:\\projects\\PayPal-Express",
-  "author": {
-    "name": "Fedor Indutny",
-    "email": "fedor@indutny.com"
-  },
+  "author": "Fedor Indutny <fedor@indutny.com>",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/indutny/elliptic/issues"
   },
-  "dependencies": {
-    "bn.js": "^4.4.0",
-    "brorand": "^1.0.1",
-    "hash.js": "^1.0.0",
-    "hmac-drbg": "^1.0.0",
-    "inherits": "^2.0.1",
-    "minimalistic-assert": "^1.0.0",
-    "minimalistic-crypto-utils": "^1.0.0"
-  },
-  "description": "EC cryptography",
+  "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
     "brfs": "^1.4.3",
     "coveralls": "^2.11.3",
@@ -14709,32 +14706,15 @@ module.exports={
     "jshint": "^2.6.0",
     "mocha": "^2.1.0"
   },
-  "files": [
-    "lib"
-  ],
-  "homepage": "https://github.com/indutny/elliptic",
-  "keywords": [
-    "EC",
-    "Elliptic",
-    "curve",
-    "Cryptography"
-  ],
-  "license": "MIT",
-  "main": "lib/elliptic.js",
-  "name": "elliptic",
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/indutny/elliptic.git"
-  },
-  "scripts": {
-    "jscs": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
-    "jshint": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
-    "lint": "npm run jscs && npm run jshint",
-    "test": "npm run lint && npm run unit",
-    "unit": "istanbul test _mocha --reporter=spec test/index.js",
-    "version": "grunt dist && git add dist/"
-  },
-  "version": "6.4.0"
+  "dependencies": {
+    "bn.js": "^4.4.0",
+    "brorand": "^1.0.1",
+    "hash.js": "^1.0.0",
+    "hmac-drbg": "^1.0.0",
+    "inherits": "^2.0.1",
+    "minimalistic-assert": "^1.0.0",
+    "minimalistic-crypto-utils": "^1.0.0"
+  }
 }
 
 },{}],91:[function(require,module,exports){
