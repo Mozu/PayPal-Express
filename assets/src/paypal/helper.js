@@ -16,6 +16,16 @@ var helper = module.exports = {
 		  c.context[constants.headers.USERCLAIMS] = null;
 	  return c;
 	},
+	getUrlPrefix: function(context){
+		//default prefix to siteSubdirectory 
+		var prefix = context.items.siteContext.siteSubdirectory || '';
+		var config = (context.configuration || {}).subdirectories;
+		//allow override of prefix from config
+		if(config && config[context.apiContext.siteId]){
+			prefix = config[context.apiContext.siteId];
+		}
+		return prefix;
+	},
 	isTokenRequest: function(context) {
 		 return context.request.url.indexOf("/paypal/token") > -1;
 	},

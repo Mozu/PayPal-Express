@@ -92,25 +92,29 @@ function setError(err, context, errorRedirectUrl ) {
 
 }
 
+
+
 module.exports = function(context, callback) {
 
 	var self = this;
+	var prefix = helper.getUrlPrefix(context);
 	var isPaypalCheckout = helper.isPayPalCheckout(context);
 	console.log("is Paypal Checkout", isPaypalCheckout);
 	if (!isPaypalCheckout) return callback();
 
 	var queryString = helper.parseUrl(context);
 	var isCart = queryString.isCart == "1";
-	var defaultRedirect = "/cart";
+	var defaultRedirect = prefix + "/cart";
 
 	paypal.checkUserSession(context);
 	console.log("Processing paypal checkout");
 
 	paypal.getCheckoutSettings(context).then(function(settings) {
+
 		try {
-			var checkoutUrl = '/checkout/';
+			var checkoutUrl = prefix + "/checkout/";
 			if (settings.isMultishipEnabled)
-				checkoutUrl = "/checkoutV2/";
+				checkoutUrl = prefix + "/checkoutV2/";
 
 			var errorRedirectUrl = (isCart ? defaultRedirect : checkoutUrl+queryString.id);
 
@@ -134,6 +138,8 @@ module.exports = function(context, callback) {
 		 console.log(err);
 		 setError(err,context, defaultRedirect);
 	 });
+
+	 
 };
 
 },{"../../paypal/checkout":5,"../../paypal/helper":7,"easy-guid":79}],4:[function(require,module,exports){
@@ -438,7 +444,7 @@ function setShippingMethod(context, order, existingShippingMethodCode, isMultiSh
 function getUserEmail(context) {
 	var user = context.items.pageContext.user;
 	console.log("user", user);
-	if ( !user.isAnonymous && user.IsAuthenticated ) {
+	if ( !user.isAnonymous && user.isAuthenticated ) {
 		console.log(user);
 		return user.email;
 	}
@@ -472,7 +478,7 @@ var paypalCheckout = module.exports = {
 	checkUserSession: function(context) {
 
 		var user = context.items.pageContext.user;
-		if ( !user.isAnonymous && !user.IsAuthenticated )
+		if ( !user.isAnonymous && !user.isAuthenticated )
 		{
       var allowWarmCheckout = (context.configuration && context.configuration.allowWarmCheckout);
       var redirectUrl = '/user/login?returnUrl=' + encodeURIComponent(context.request.url);
@@ -489,7 +495,7 @@ var paypalCheckout = module.exports = {
 		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
-		var domain = [context.items.siteContext.secureHost,context.items.siteContext.siteSubdirectory].filter(Boolean).join('');
+		var domain = [context.items.siteContext.secureHost,helper.getUrlPrefix(context)].filter(Boolean).join('');
 		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
 		var createRedirectUrl = function(isMultiShip) {
 			var url = domain + "/paypal/checkout?id=" + id + "&isCart=" + (isCart ? 1 : 0);
@@ -518,7 +524,7 @@ var paypalCheckout = module.exports = {
 					console.log(order.email);
 					return {
 						config: config,
-						order: helper.getOrderDetails(order,true )
+						order: helper.getOrderDetails(order, true, null, settings.isMultishipEnabled)
 					};
 	
 				});
@@ -563,7 +569,7 @@ var paypalCheckout = module.exports = {
 			//convert card to order or get existing order
 			return convertCartToOrder(context, id, isCart,isMultiShipToEnabled).then(
 				function(order){
-					var existingShippingMethodCode = order.groupings;//order.fulfillmentInfo.shippingMethodCode;
+					var existingShippingMethodCode = isMultiShipToEnabled ? order.groupings: order.fulfillmentInfo.shippingMethodCode;
 					var shipItems = _.filter(order.items,function(item) {return item.fulfillmentMethod === "Ship";});
 					var requiresFulfillmentInfo = false;
 					if (shipItems && shipItems.length > 0)
@@ -592,7 +598,13 @@ var paypalCheckout = module.exports = {
 			});
 		}).then(function(response){
 			//set Shipping address
+			console.log("Should update fulfillment ? ", response.requiresFulfillmentInfo ? "Yes": "No");
 			if (!response.requiresFulfillmentInfo) return response;
+
+			// If the order is from a quote, don't update fulfillment info / shipping address on order
+			console.log("Is quote order ? ", response.order.originalQuoteId ? "Yes": "No");
+			if (response.order.originalQuoteId) return response;
+			
 			return setFulfillmentInfo(context, response.order, response.paypalOrder, isMultiShipToEnabled).
 			then(function(fulfillmentInfo) {
 				if (!isMultiShipToEnabled)
@@ -626,34 +638,35 @@ var paypalCheckout = module.exports = {
 	    console.log("Payment Action", paymentAction);
 		console.log("Payment", payment);
 		
-	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) callback();
+	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) return callback();
 
 		return paymentHelper.getPaymentConfig(context)
 		.then(function(config) {
 			switch(paymentAction.actionName) {
-            case "CreatePayment":
-                console.log("adding new payment interaction for ", paymentAction.externalTransactionId);
-                return paymentHelper.createNewPayment(context, paymentAction);
-            case "VoidPayment":
-                console.log("Voiding payment interaction for ", payment.externalTransactionId);
-                console.log("Void Payment", payment.id);
-                return paymentHelper.voidPayment(context, config, paymentAction,payment);
-            case "AuthorizePayment":
-				console.log("Authorizing payment for ", payment.externalTransactionId);
-                return paymentHelper.authorizePayment(context,config, paymentAction, payment);
-            case "CapturePayment":
-                console.log("Capturing payment for ", payment.externalTransactionId);
-                return paymentHelper.captureAmount(context, config, paymentAction, payment);
-            case "CreditPayment":
-                console.log("Crediting payment for ", payment.externalTransactionId);
-                return paymentHelper.creditPayment(context, config, paymentAction, payment);
-            case "DeclinePayment":
-                console.log("Decline payment for ",payment.externalTransactionId);
-                return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
-            default:
-              return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
-          }
-		}).then(function(result) {
+            	case "CreatePayment":
+            	    console.log("adding new payment interaction for ", paymentAction.externalTransactionId);
+            	    return paymentHelper.createNewPayment(context, paymentAction);
+            	case "VoidPayment":
+            	    console.log("Voiding payment interaction for ", payment.externalTransactionId);
+            	    console.log("Void Payment", payment.id);
+            	    return paymentHelper.voidPayment(context, config, paymentAction,payment);
+            	case "AuthorizePayment":
+					console.log("Authorizing payment for ", payment.externalTransactionId);
+            	    return paymentHelper.authorizePayment(context,config, paymentAction, payment);
+            	case "CapturePayment":
+            	    console.log("Capturing payment for ", payment.externalTransactionId);
+            	    return paymentHelper.captureAmount(context, config, paymentAction, payment);
+            	case "CreditPayment":
+            	    console.log("Crediting payment for ", payment.externalTransactionId);
+            	    return paymentHelper.creditPayment(context, config, paymentAction, payment);
+            	case "DeclinePayment":
+            	    console.log("Decline payment for ",payment.externalTransactionId);
+            	    return {status: paymentConstants.DECLINED, responseText: "Declined", responseCode: "Declined", amount: paymentAction.amount};
+            	default:
+              		return {status: paymentConstants.FAILED,responseText: "Not implemented", responseCode: "NOTIMPLEMENTED"};
+          	}
+		})
+		.then(function(result) {
 			var actionName = paymentAction.actionName;
 			if (result.captureOnAuthorize) {
 				//result = captureResult;
@@ -661,37 +674,44 @@ var paypalCheckout = module.exports = {
 			}
 			paymentHelper.processPaymentResult(context, result, actionName, paymentAction.manualGatewayInteraction, payment);
 			callback();
-		}, callback);
+		})
+		.catch(function(err){
+			console.log("error:", err);
+			callback();
+		});
 	},
 	addErrorToViewData : function(context, callback) {
 		cache  = context.cache.getOrCreate({type:'distributed', scope:'tenant', level:'shared'});
 		var queryString = helper.parseUrl(context);
 
 		if (queryString.ppErrorId){
-			var paypalError = cache.get("PPE-"+queryString.ppErrorId);
-			if (paypalError) {
-				console.log("Adding paypal error to viewData", paypalError);
-				var message = paypalError;
-				if (paypalError.statusText)
-					message = paypalError.statusText;
-        else if (paypalError.originalError) {
-          console.log("originalError", paypalError.originalError);
-          if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
-            message = paypalError.originalError.items[0].message;
-          else
-           message = paypalError.originalError.message;
-         }
-				else if (paypalError.message){
-					message = paypalError.message;
-					if (message.errorMessage)
-						message = message.errorMessage;
-
-				}
-				else if (paypalError.errorMessage)
-					message = paypalError.errorMessage;
-
-				context.response.viewData.model.messages = [{'message' : message}];
-			}
+			cache.get("PPE-"+queryString.ppErrorId)
+				.then(function(paypalError){				
+					console.log("Adding paypal error to viewData", paypalError);
+					var message = paypalError;
+					if (paypalError.statusText)
+						message = paypalError.statusText;
+					else if (paypalError.originalError) {
+				  		console.log("originalError", paypalError.originalError);
+				  		if (paypalError.originalError.items  && paypalError.originalError.items.length > 0)
+							message = paypalError.originalError.items[0].message;
+				  		else
+				   			message = paypalError.originalError.message;
+				 	}
+					else if (paypalError.message){
+						message = paypalError.message;
+						if (message.errorMessage)
+							message = message.errorMessage;	
+					}
+					else if (paypalError.errorMessage)
+						message = paypalError.errorMessage;	
+					context.response.viewData.model.messages = [{'message' : message}];	
+					callback();			
+				})
+				.catch(function(err){
+					console.log("cannot get paypal error from cache:", err);
+					callback();
+				});
 		}
 		callback();
 	}
@@ -735,6 +755,16 @@ var helper = module.exports = {
 	  if (removeClaims)
 		  c.context[constants.headers.USERCLAIMS] = null;
 	  return c;
+	},
+	getUrlPrefix: function(context){
+		//default prefix to siteSubdirectory 
+		var prefix = context.items.siteContext.siteSubdirectory || '';
+		var config = (context.configuration || {}).subdirectories;
+		//allow override of prefix from config
+		if(config && config[context.apiContext.siteId]){
+			prefix = config[context.apiContext.siteId];
+		}
+		return prefix;
 	},
 	isTokenRequest: function(context) {
 		 return context.request.url.indexOf("/paypal/token") > -1;
@@ -853,13 +883,13 @@ var helper = module.exports = {
 		var items = this.getActiveDiscountItems(order.shippingDiscounts);
 		return _.reduce(items, function(sum, item) {return sum+item.amount;},0);
 	},
-	getOrderDetails: function(order, includeShipping, paymentAction) {
+	getOrderDetails: function(order, includeShipping, paymentAction, isMultishipEnabled) {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal || (((order.itemTaxTotal + order.shippingTaxTotal + order.handlingTaxTotal+0.00001) * 100) / 100),
 			handlingAmount: (order.groupings ? (order.handlingTotal - order.handlingTaxTotal) : order.handlingTotal),
-			shippingAmount:  order.shippingSubTotal,
-			shippingDiscount: self.getShippingDiscountAmount(order),
+			shippingAmount: isMultishipEnabled ? (order.shippingSubTotal - order.itemLevelShippingDiscountTotal) : order.shippingSubTotal,
+			shippingDiscount: isMultishipEnabled ? order.orderLevelShippingDiscountTotal : self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
 		};
 
@@ -1089,7 +1119,7 @@ module.exports = {
 			console.log('is for checkout', isMultishipEnabled);
 			var order = isMultishipEnabled ? context.get.checkout() : context.get.order();
 
-			var details = helper.getOrderDetails(order,false, paymentAction);
+			var details = helper.getOrderDetails(order, false, paymentAction, isMultishipEnabled);
 
 			var existingPayment = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected";   });
 			var existingAuthorized = _.find(order.payments,function(payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized";   });
@@ -1179,9 +1209,12 @@ module.exports = {
 			var client = self.getPaypalClient(config);
 			var isPartial =  true;
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
-			paymentAction.amount = context.configuration.paypal.capture.amount;
+      paymentAction.amount = context.configuration.paypal.capture.amount;
 
-			return client.doCapture(payment.externalTransactionId,order.orderNumber,
+      //Using interaction target field to prefer sending checkout number for multiship order.In case of multiship, authorization always happens at checkout level
+      var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
+
+      return client.doCapture(payment.externalTransactionId, number,
 						paymentAuthorizationInteraction.gatewayTransactionId,
 						paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function(captureResult){
@@ -15371,53 +15404,37 @@ utils.intFromLE = intFromLE;
 
 },{"bn.js":26,"minimalistic-assert":138,"minimalistic-crypto-utils":139}],95:[function(require,module,exports){
 module.exports={
-  "_args": [
-    [
-      "elliptic@6.4.0",
-      "C:\\projects\\PayPal-Express"
-    ]
+  "name": "elliptic",
+  "version": "6.4.0",
+  "description": "EC cryptography",
+  "main": "lib/elliptic.js",
+  "files": [
+    "lib"
   ],
-  "_development": true,
-  "_from": "elliptic@6.4.0",
-  "_id": "elliptic@6.4.0",
-  "_inBundle": false,
-  "_integrity": "sha1-ysmvh2LIWDYYcAPI3+GT5eLq5d8=",
-  "_location": "/elliptic",
-  "_phantomChildren": {},
-  "_requested": {
-    "type": "version",
-    "registry": true,
-    "raw": "elliptic@6.4.0",
-    "name": "elliptic",
-    "escapedName": "elliptic",
-    "rawSpec": "6.4.0",
-    "saveSpec": null,
-    "fetchSpec": "6.4.0"
+  "scripts": {
+    "jscs": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
+    "jshint": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
+    "lint": "npm run jscs && npm run jshint",
+    "unit": "istanbul test _mocha --reporter=spec test/index.js",
+    "test": "npm run lint && npm run unit",
+    "version": "grunt dist && git add dist/"
   },
-  "_requiredBy": [
-    "/browserify-sign",
-    "/create-ecdh"
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:indutny/elliptic"
+  },
+  "keywords": [
+    "EC",
+    "Elliptic",
+    "curve",
+    "Cryptography"
   ],
-  "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
-  "_spec": "6.4.0",
-  "_where": "C:\\projects\\PayPal-Express",
-  "author": {
-    "name": "Fedor Indutny",
-    "email": "fedor@indutny.com"
-  },
+  "author": "Fedor Indutny <fedor@indutny.com>",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/indutny/elliptic/issues"
   },
-  "dependencies": {
-    "bn.js": "^4.4.0",
-    "brorand": "^1.0.1",
-    "hash.js": "^1.0.0",
-    "hmac-drbg": "^1.0.0",
-    "inherits": "^2.0.1",
-    "minimalistic-assert": "^1.0.0",
-    "minimalistic-crypto-utils": "^1.0.0"
-  },
-  "description": "EC cryptography",
+  "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
     "brfs": "^1.4.3",
     "coveralls": "^2.11.3",
@@ -15434,32 +15451,15 @@ module.exports={
     "jshint": "^2.6.0",
     "mocha": "^2.1.0"
   },
-  "files": [
-    "lib"
-  ],
-  "homepage": "https://github.com/indutny/elliptic",
-  "keywords": [
-    "EC",
-    "Elliptic",
-    "curve",
-    "Cryptography"
-  ],
-  "license": "MIT",
-  "main": "lib/elliptic.js",
-  "name": "elliptic",
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/indutny/elliptic.git"
-  },
-  "scripts": {
-    "jscs": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
-    "jshint": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
-    "lint": "npm run jscs && npm run jshint",
-    "test": "npm run lint && npm run unit",
-    "unit": "istanbul test _mocha --reporter=spec test/index.js",
-    "version": "grunt dist && git add dist/"
-  },
-  "version": "6.4.0"
+  "dependencies": {
+    "bn.js": "^4.4.0",
+    "brorand": "^1.0.1",
+    "hash.js": "^1.0.0",
+    "hmac-drbg": "^1.0.0",
+    "inherits": "^2.0.1",
+    "minimalistic-assert": "^1.0.0",
+    "minimalistic-crypto-utils": "^1.0.0"
+  }
 }
 
 },{}],96:[function(require,module,exports){

@@ -36,25 +36,29 @@ function setError(err, context, errorRedirectUrl ) {
 
 }
 
+
+
 module.exports = function(context, callback) {
 
 	var self = this;
+	var prefix = helper.getUrlPrefix(context);
 	var isPaypalCheckout = helper.isPayPalCheckout(context);
 	console.log("is Paypal Checkout", isPaypalCheckout);
 	if (!isPaypalCheckout) return callback();
 
 	var queryString = helper.parseUrl(context);
 	var isCart = queryString.isCart == "1";
-	var defaultRedirect = "/cart";
+	var defaultRedirect = prefix + "/cart";
 
 	paypal.checkUserSession(context);
 	console.log("Processing paypal checkout");
 
 	paypal.getCheckoutSettings(context).then(function(settings) {
+
 		try {
-			var checkoutUrl = '/checkout/';
+			var checkoutUrl = prefix + "/checkout/";
 			if (settings.isMultishipEnabled)
-				checkoutUrl = "/checkoutV2/";
+				checkoutUrl = prefix + "/checkoutV2/";
 
 			var errorRedirectUrl = (isCart ? defaultRedirect : checkoutUrl+queryString.id);
 
@@ -78,4 +82,6 @@ module.exports = function(context, callback) {
 		 console.log(err);
 		 setError(err,context, defaultRedirect);
 	 });
+
+	 
 };

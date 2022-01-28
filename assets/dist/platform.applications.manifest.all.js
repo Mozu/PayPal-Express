@@ -120,23 +120,23 @@ function AppInstall(context, callback) {
 
       "embedded.commerce.payments.action.performPaymentInteraction" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 30000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 25000;
         return settings;
       },
       "paypalPaymentActionBefore" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 30000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 25000;
         return settings;
       },
       "paypalProcessor" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 30000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 25000;
         settings.configuration = settings.configuration || {"addBillingInfo" : false, "missingLastNameValue" : "N/A", "allowWarmCheckout" : true};
         return settings;
       },
       "paypalToken" : function(settings) {
         settings = settings || {};
-        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 15000;
+        settings.timeoutMilliseconds = settings.timeoutMilliseconds || 25000;
         return settings;
       }
 
@@ -268,6 +268,16 @@ var helper = module.exports = {
 		  c.context[constants.headers.USERCLAIMS] = null;
 	  return c;
 	},
+	getUrlPrefix: function(context){
+		//default prefix to siteSubdirectory 
+		var prefix = context.items.siteContext.siteSubdirectory || '';
+		var config = (context.configuration || {}).subdirectories;
+		//allow override of prefix from config
+		if(config && config[context.apiContext.siteId]){
+			prefix = config[context.apiContext.siteId];
+		}
+		return prefix;
+	},
 	isTokenRequest: function(context) {
 		 return context.request.url.indexOf("/paypal/token") > -1;
 	},
@@ -385,13 +395,13 @@ var helper = module.exports = {
 		var items = this.getActiveDiscountItems(order.shippingDiscounts);
 		return _.reduce(items, function(sum, item) {return sum+item.amount;},0);
 	},
-	getOrderDetails: function(order, includeShipping, paymentAction) {
+	getOrderDetails: function(order, includeShipping, paymentAction, isMultishipEnabled) {
 		var self = this;
 		var orderDetails = {
 			taxAmount: order.taxTotal || (((order.itemTaxTotal + order.shippingTaxTotal + order.handlingTaxTotal+0.00001) * 100) / 100),
 			handlingAmount: (order.groupings ? (order.handlingTotal - order.handlingTaxTotal) : order.handlingTotal),
-			shippingAmount:  order.shippingSubTotal,
-			shippingDiscount: self.getShippingDiscountAmount(order),
+			shippingAmount: isMultishipEnabled ? (order.shippingSubTotal - order.itemLevelShippingDiscountTotal) : order.shippingSubTotal,
+			shippingDiscount: isMultishipEnabled ? order.orderLevelShippingDiscountTotal : self.getShippingDiscountAmount(order),
 			items: self.getItems(order, false)
 		};
 

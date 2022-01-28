@@ -301,7 +301,7 @@ var paypalCheckout = module.exports = {
 		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
-		var domain = [context.items.siteContext.secureHost,context.items.siteContext.siteSubdirectory].filter(Boolean).join('');
+		var domain = [context.items.siteContext.secureHost,helper.getUrlPrefix(context)].filter(Boolean).join('');
 		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
 		var createRedirectUrl = function(isMultiShip) {
 			var url = domain + "/paypal/checkout?id=" + id + "&isCart=" + (isCart ? 1 : 0);
