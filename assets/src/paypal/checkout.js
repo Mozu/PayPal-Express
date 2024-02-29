@@ -482,8 +482,8 @@ var paypalCheckout = module.exports = {
 			callback();
 		})
 		.catch(function(err){
-			console.log("error:", err);
-			callback();
+			console.log("error processing payment:", err);
+			callback(err);
 		});
 	},
 	addErrorToViewData : function(context, callback) {
