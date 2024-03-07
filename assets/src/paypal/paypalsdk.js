@@ -27,6 +27,7 @@ Paypal.prototype.params = function() {
 	return result;
 };
 
+//TODO: This is a old function Optimize this
 function prepareNumber(num, doubleZero) {
 	var str = num.toString().replace(',', '.');
 
@@ -118,7 +119,7 @@ Paypal.prototype.getExpressCheckoutDetails = function(token, requiresBillingAddr
 
 	params.TOKEN = token;
 	params.METHOD = 'GetExpressCheckoutDetails';
-  params.REQBILLINGADDRESS = (requiresBillingAddress ? 1 : 0);
+  	params.REQBILLINGADDRESS = (requiresBillingAddress ? 1 : 0);
 	console.log(params);
 
 	return self.request(params);
@@ -153,7 +154,6 @@ Paypal.prototype.setExpressCheckoutPayment = function(order, returnUrl, cancelUr
 			};
 	});
 };
-
 
 Paypal.prototype.authorizePayment = function(orderDetails, config) {
 	var self = this;

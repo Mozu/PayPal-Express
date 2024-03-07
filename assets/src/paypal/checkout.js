@@ -69,23 +69,34 @@ function convertCartToOrder(context, id, isCart, isMultiShip) {
 }
 
 function setFulfillmentInfo(context, order, paypalOrder, isMultiShipToEnabled) {
-	console.log("ship to name",paypalOrder.SHIPTONAME);
 	var registeredShopper = getUserEmail(context);
-	var splitName = getFirstAndLastName(context, paypalOrder.SHIPTONAME);
+	const { payer = {}, purchase_units } = paypalOrder;
+	const { name, email_address, phone } = payer || {};
+	const { given_name: firstName, surname } = name || {};
+	const { shipping } = purchase_units ? purchase_units[0] : {};
+	const { address_line_1,
+		address_line_2,
+		admin_area_1,
+		admin_area_2,
+		postal_code,
+		country_code } =
+		shipping.address || {};
+
+	console.log("ship to name",firstName + ' ' + surname);
 	var contact = {
-		"firstName" : splitName[0],
-		"lastNameOrSurname" : splitName[1],
-		"email" : registeredShopper || paypalOrder.EMAIL,
+		"firstName" : firstName,
+		"lastNameOrSurname" : surname,
+		"email" : registeredShopper || email_address,
 		"phoneNumbers" : {
-			"home" : paypalOrder.SHIPTOPHONENUM || (paypalOrder.PHONENUM || "N/A")
+			"home" : phone ? phone.phone_number.national_number : "N/A"
 		},
 		"address" : {
-			"address1" : paypalOrder.SHIPTOSTREET,
-			"address2" : paypalOrder.SHIPTOSTREET2,
-			"cityOrTown" : paypalOrder.SHIPTOCITY,
-			"stateOrProvince": paypalOrder.SHIPTOSTATE,
-			"postalOrZipCode": paypalOrder.SHIPTOZIP,
-			"countryCode": paypalOrder.SHIPTOCOUNTRYCODE,
+			"address1" : address_line_1,
+			"address2" : address_line_2,
+			"cityOrTown" : admin_area_2,
+			"stateOrProvince": admin_area_1,
+			"postalOrZipCode": postal_code,
+			"countryCode": country_code,
 			"addressType": "Residential",
 			"isValidated": "true"
 		}
@@ -120,28 +131,40 @@ function setFulfillmentInfo(context, order, paypalOrder, isMultiShipToEnabled) {
 	}
 }
 
-
-function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo,isMultiShipToEnabled) {
+function setPayment(context, order, token, payerId, paypalOrder, addBillingInfo, isMultiShipToEnabled) {
 	console.log("order", order);
 	if (order.amountRemainingForPayment < 0) return order;
 	var registeredShopper = getUserEmail(context);
 	
-	var billingContact = {"email" : registeredShopper || paypalOrder.EMAIL};
+	const { payer = {} } = paypalOrder || {};
+	const { address, email_address, phone, name } = payer;
 
-	if (addBillingInfo && paypalOrder.BILLINGNAME) {
-		var splitName = getFirstAndLastName(context, paypalOrder.BILLINGNAME);
+	var billingContact = {"email" : registeredShopper || email_address};
+	
+	if (addBillingInfo && address) {
+		const { given_name: firstName, surname: lastName, } = name;
 
-		billingContact.firstName  = splitName[0];
-		billingContact.lastNameOrSurname = splitName[1];
-		billingContact.phoneNumbers = {"home" : paypalOrder.PHONENUM || "N/A"};
+		const { address_line_1,
+			address_line_2,
+			admin_area_1,
+			admin_area_2,
+			postal_code,
+			country_code } =
+			address;
+		
+
+		billingContact.firstName  = firstName;
+		billingContact.lastNameOrSurname = lastName;
+		billingContact.phoneNumbers = { "home": phone ? phone.phone_number.national_number : "N/A" };
 		billingContact.address= {
-			"address1": paypalOrder.STREET,
-			"cityOrTown": paypalOrder.CITY,
-			"stateOrProvince": paypalOrder.STATE,
-			"postalOrZipCode": paypalOrder.ZIP,
-			"countryCode": paypalOrder.COUNTRY,
+			"address1": address_line_1,
+			"address2": address_line_2,
+			"cityOrTown": admin_area_2,
+			"stateOrProvince": admin_area_1,
+			"postalOrZipCode": postal_code,
+			"countryCode": country_code,
 			"addressType": 'Residential',
-			"isValidated": paypalOrder.ADDRESSSTATUS === "Confirmed" ? true : false
+			"isValidated": true
 		};
 	}
 
@@ -155,7 +178,7 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo,i
 	        "paymentWorkflow": paymentConstants.PAYMENTSETTINGID,
 	        "card" : null,
 	        "billingContact" : billingContact,
-          "externalTransactionId" : token,
+          	"externalTransactionId" : token,
 	        "isSameBillingShippingAddress" : false,
 	         "data" : {
 	        	"paypal": {
@@ -257,24 +280,7 @@ function getUserEmail(context) {
 	return null;
 }
 
-function getFirstAndLastName(context, fullName) {
-	var fullNameTrimmed = fullName.trim();
-	var nameParts = fullNameTrimmed.split(/\s+/g);
-	var firstName = nameParts[0].trim();
-	var lastName = context.configuration.missingLastNameValue;
-
-	// Treat all but the first part as the last name.
-	// e.g., "Ga Ga" => ["Ga", "Ga"] => "Ga"
-	// e.g., "John Johnson" => ["John", "Johnson"] => "Johnson"
-	// e.g., "Eric Robert Smith" => ["Eric", "Robert", "Smith"] => "Robert Smith"
-	if (nameParts.length > 1) {
-		lastName = nameParts.slice(1, nameParts.length).join(" ").trim();
-	}
-
-	return [firstName, lastName];
-}
-
-var paypalCheckout = module.exports = {
+module.exports = {
 	getCheckoutSettings: function(context) {
 		var client = helper.createClientFromContext(generalSettings,context, true);
 		return client.getGeneralSettings().then(function(setting){
@@ -298,6 +304,7 @@ var paypalCheckout = module.exports = {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
+		var originalOrder;
 		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
@@ -325,7 +332,8 @@ var paypalCheckout = module.exports = {
 				cancelUrl = createCancelUrl(settings.isMultishipEnabled);
 
 				return helper.getOrder(context, id, isCart, settings.isMultishipEnabled).then(function(order) {
-					
+					originalOrder = order;
+					console.log('original order', order);
 					order.email = getUserEmail(context);
 					console.log(order.email);
 					return {
@@ -337,16 +345,17 @@ var paypalCheckout = module.exports = {
 			});
 		}).then(function(response) {
 			var client = paymentHelper.getPaypalClient(response.config);
-			client.setPayOptions(1,0,0);
+			// client.setPayOptions(1,0,0);
 			console.log("configuration", context.configuration);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
 				response.order.maxAmount = context.configuration.paypal.setExpressCheckout.maxAmount;
 
 
-			return client.setExpressCheckoutPayment(
+			return client.CreateOrder(
 					response.order,
 					redirectUrl,
-					cancelUrl
+					cancelUrl,
+					originalOrder
 				);
 		});
 
@@ -396,7 +405,7 @@ var paypalCheckout = module.exports = {
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
 
-			return client.getExpressCheckoutDetails(token, addBillingInfo).
+			return client.getOrderDetails(token).
 			then(function(paypalOrder) {
 				console.log("paypal order", paypalOrder);
 				response.paypalOrder = paypalOrder;

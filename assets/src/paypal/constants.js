@@ -1,5 +1,5 @@
 module.exports = {
-	PAYMENTSETTINGID : "PayPalExpress2",
+	PAYMENTSETTINGID: "PayPalExpress2",
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
@@ -11,9 +11,18 @@ module.exports = {
 	FAILED: "Failed",
 	NEW: "New",
 	DECLINED: "Declined",
+	
 	AUTHORIZED: "Authorized",
 	CAPTURED: "Captured",
 	CREDITED: "Credited",
 	CREDITPENDING: "CreditPending",
-	VOIDED: "Voided"
+	VOIDED: "Voided",
+	palPaymentStatuses: {
+		FAILED: "FAILED",
+		DENIED: "DENIED",
+	},
+	LinkStatuses: {
+		APPROVE: "approve"
+	}
 };
+
