@@ -53,7 +53,7 @@ ApiService.prototype.post = async function (url, body, headers, needAuth = false
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -86,15 +86,13 @@ ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     return headers;
 };
 
-const constructErrorResponse = function (err, body) {
+const constructErrorResponse = function (err) {
     const { debug_id, message, error_description, details = {}, statusCode } = err;
     const { description } = (details ? details[0] : details) || {};
     return {
         correlationId: debug_id,
         statusCode,
         errorMessage: description || error_description || message,
-        err: err,
-        body
     };
 };
 

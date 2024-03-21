@@ -304,7 +304,6 @@ module.exports = {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
-		var originalOrder;
 		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
@@ -332,7 +331,6 @@ module.exports = {
 				cancelUrl = createCancelUrl(settings.isMultishipEnabled);
 
 				return helper.getOrder(context, id, isCart, settings.isMultishipEnabled).then(function(order) {
-					originalOrder = order;
 					console.log('original order', order);
 					order.email = getUserEmail(context);
 					console.log(order.email);
@@ -354,8 +352,7 @@ module.exports = {
 			return client.CreateOrder(
 					response.order,
 					redirectUrl,
-					cancelUrl,
-					originalOrder
+					cancelUrl
 				);
 		});
 

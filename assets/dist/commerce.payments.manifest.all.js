@@ -462,7 +462,6 @@ module.exports = {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
-		var originalOrder;
 		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
@@ -490,7 +489,6 @@ module.exports = {
 				cancelUrl = createCancelUrl(settings.isMultishipEnabled);
 
 				return helper.getOrder(context, id, isCart, settings.isMultishipEnabled).then(function(order) {
-					originalOrder = order;
 					console.log('original order', order);
 					order.email = getUserEmail(context);
 					console.log(order.email);
@@ -512,8 +510,7 @@ module.exports = {
 			return client.CreateOrder(
 					response.order,
 					redirectUrl,
-					cancelUrl,
-					originalOrder
+					cancelUrl
 				);
 		});
 
@@ -1274,7 +1271,7 @@ module.exports = {
 },{"./constants":5,"./helper":6,"./rest/paypalsdk":8,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":203,"underscore":306}],8:[function(require,module,exports){
 const { constructOrderDetails, getAmount } = require("../../utils");
 const { ApiService } = require("../../utils/apiService");
-const { URLS } = require("../../utils/constants");
+const { URLS, LINKREL } = require("../../utils/constants");
 
 function Paypal(clientId, clientSecret, sandbox = false) {
     this.apiWrapper = new ApiService(clientId, clientSecret);
@@ -1307,18 +1304,17 @@ Paypal.prototype.getOrderDetails = async function (id) {
     }
 };
 
-Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl, originalOrder) {
+Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl) {
     try {
         const payload = constructOrderDetails(order, returnUrl, cancelUrl);
 
         const res = await this.apiWrapper.postWithAuth(this.orderUrl, payload);
         const { id, links } = res || {};
-        const redirectData = links && links.find(link => link.rel === 'payer-action');
+        const redirectData = links && links.find(link => link.rel === LINKREL.payerAction);
         const redirectLink = redirectData ? redirectData.href : null;
         return {
             redirectLink,
             order,
-            originalOrder,
             token: id,
             correlationId: null // TODO:  Need to check how we can get this.
         };
@@ -1439,7 +1435,7 @@ ApiService.prototype.post = async function (url, body, headers, needAuth = false
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -1472,15 +1468,13 @@ ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     return headers;
 };
 
-const constructErrorResponse = function (err, body) {
+const constructErrorResponse = function (err) {
     const { debug_id, message, error_description, details = {}, statusCode } = err;
     const { description } = (details ? details[0] : details) || {};
     return {
         correlationId: debug_id,
         statusCode,
         errorMessage: description || error_description || message,
-        err: err,
-        body
     };
 };
 
@@ -1537,6 +1531,10 @@ module.exports = {
     PAYMENTINTENT: {
         capture: 'CAPTURE',
         authorize: 'AUTHORIZE'
+    },
+    LINKREL: {
+        payerAction: 'payer-action',
+        approve: 'approve'
     }
 };
 },{}],11:[function(require,module,exports){

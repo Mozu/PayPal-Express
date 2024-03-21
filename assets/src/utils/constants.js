@@ -18,5 +18,9 @@ module.exports = {
     PAYMENTINTENT: {
         capture: 'CAPTURE',
         authorize: 'AUTHORIZE'
+    },
+    LINKREL: {
+        payerAction: 'payer-action',
+        approve: 'approve'
     }
 };

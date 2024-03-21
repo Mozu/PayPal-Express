@@ -1,6 +1,6 @@
 const { constructOrderDetails, getAmount } = require("../../utils");
 const { ApiService } = require("../../utils/apiService");
-const { URLS } = require("../../utils/constants");
+const { URLS, LINKREL } = require("../../utils/constants");
 
 function Paypal(clientId, clientSecret, sandbox = false) {
     this.apiWrapper = new ApiService(clientId, clientSecret);
@@ -33,18 +33,17 @@ Paypal.prototype.getOrderDetails = async function (id) {
     }
 };
 
-Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl, originalOrder) {
+Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl) {
     try {
         const payload = constructOrderDetails(order, returnUrl, cancelUrl);
 
         const res = await this.apiWrapper.postWithAuth(this.orderUrl, payload);
         const { id, links } = res || {};
-        const redirectData = links && links.find(link => link.rel === 'payer-action');
+        const redirectData = links && links.find(link => link.rel === LINKREL.payerAction);
         const redirectLink = redirectData ? redirectData.href : null;
         return {
             redirectLink,
             order,
-            originalOrder,
             token: id,
             correlationId: null // TODO:  Need to check how we can get this.
         };
