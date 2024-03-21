@@ -15,8 +15,9 @@ exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
     const shipping = getShipping(order);
     const items = getItems(order);
     const amount = currency.getAmount(order.amount);
-    amount.breakdown = breakdown;
 
+    amount.breakdown = breakdown;
+    reconcileAmount(amount);
     const purchaseUnit =
     {
         invoice_id: order.number,
@@ -34,6 +35,13 @@ exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
         payment_source: constructPaymentSource(returnUrl, cancelUrl)
     };
 };
+
+function reconcileAmount({ value: total, breakdown }) {
+    const sumOfBreakdown = Object.values(breakdown).reduce((a, c) => a + parseFloat(c.value), 0);
+    const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
+    const fieldToReconcile = breakdown[BREAKDOWNLOOKUP.tax_total];
+    fieldToReconcile.value = parseFloat(keyToAdjust.value) + reminder;
+}
 
 function constructPaymentSource(returnUrl, cancelUrl) {
     return {
