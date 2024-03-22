@@ -1039,7 +1039,7 @@ module.exports = {
 		var newStatus = { status: paymentConstants.NEW, amount: paymentAction.amount };
 		return newStatus;
 	},
-	generateResponseText({status, correlationId}) {
+	generateResponseText({ status, correlationId }) {
 		return `${status} ${correlationId ? ' - ' + correlationId : ''}`;
 	},
 	getPaymentResult: function (result, status, amount) {
@@ -1165,7 +1165,7 @@ module.exports = {
 			response.processingFailed = details.processingFailed;
 			return response;
 		}
-		return client.authorizePayment(details.token).
+		return client.authorizePayment(details.token, details).
 			then(function (result) {
 				return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
 			}, function (err) {
@@ -1303,7 +1303,7 @@ module.exports = {
 };
 
 },{"./constants":6,"./helper":7,"./rest/paypalsdk":9,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":206,"underscore":309}],9:[function(require,module,exports){
-const { constructOrderDetails, getAmount } = require("../../utils");
+const { constructOrderDetails, getAmount, construsctOrderAmount } = require("../../utils");
 const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
@@ -1324,7 +1324,7 @@ function Paypal(clientId, clientSecret, sandbox = false) {
 
     this.orderUrl = baseUrl + orderUrlPrefix;
     this.paymentAuthUrl = paymentUrl + paymentAuthPrefix;
-    this.paymentCaptureUr = paymentUrl + paymentCapturePrefix;
+    this.paymentCaptureUrl = paymentUrl + paymentCapturePrefix;
 }
 
 Paypal.prototype.getOrderDetails = async function (id) {
@@ -1341,7 +1341,6 @@ Paypal.prototype.getOrderDetails = async function (id) {
 Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl) {
     try {
         const payload = constructOrderDetails(order, returnUrl, cancelUrl);
-
         const res = await this.apiWrapper.postWithAuth(this.orderUrl, payload);
         const { id, links } = res || {};
         const redirectData = links && links.find(link => link.rel === LINKREL.payerAction);
@@ -1357,9 +1356,10 @@ Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl) {
     }
 };
 
-Paypal.prototype.authorizePayment = async function (id) {
+Paypal.prototype.authorizePayment = async function (id, order) {
     const url = `${this.orderUrl}/${id}/authorize`;
     try {
+        await this.updateOrder(id, order);
         const res = await this.apiWrapper.postWithAuth(url);
         const { purchase_units: units = [] } = res || [];
         const { payments } = units.length > 0 ? units[0] : {};
@@ -1411,6 +1411,61 @@ Paypal.prototype.refundCapturePayment = async function (captureId) {
         throw e;
     }
 };
+
+Paypal.prototype.updateOrder = async function (id, order) {
+    try {
+        const url = `${this.orderUrl}/${id}`;
+        const amount = construsctOrderAmount(order);
+        const body = {
+            op: 'replace',
+            path: "/purchase_units/@reference_id=='default'/amount",
+            value: amount
+        };
+
+        const res = await this.apiWrapper.patchWithAuth(url, [body]);
+        return res;
+    } catch (e) {
+        throw e;
+    }
+};
+
+// executeflow = async () => {
+//     try {
+//         var clientId = "AdaIh11Rl_6gHSmZkCjUu0dGiXgnVjV50Zjb8OZz-Wod2GwSlHQSndcuxKYUKAgVIcMe4JI8xGXPZ_aU";
+//         var clientSecret = "ELyzjzLdYbLa61GUa91hdUvphaIEgk71UTzwb4SfUvlBMO2-V_UniWVLelios4f7rW7bDOi3yzJBEVUq";
+//         const pal = new Paypal(clientId, clientSecret, true);
+//         // const res = await pal.CreateOrder();
+//         // const res = await pal.getOrderDetails('68F07069KW0900007');
+//         const amount = {
+//             currency_code: "USD",
+//             value: "8.00",
+//             breakdown: {
+//                 shipping: {
+//                     currency_code: "USD",
+//                     value: "2.00"
+//                 },
+//                 tax_total: {
+//                     currency_code: "USD",
+//                     value: "2.00"
+//                 },
+//                 handling: {
+//                     currency_code: "USD",
+//                     value: "2.00"
+//                 },
+//                 item_total: {
+//                     currency_code: "USD",
+//                     value: "2.00"
+//                 }
+//             }
+//         }
+//         const res = await pal.updateOrder({}, '68F07069KW0900007', amount);
+//         console.log(res);
+//     } catch (e) {
+//         console.log(e);
+//     }
+// }
+
+// executeflow();
 
 exports.PaypalRestSdk = Paypal;
 },{"../../utils":13,"../../utils/apiService":11,"../../utils/constants":12}],10:[function(require,module,exports){
@@ -1505,6 +1560,28 @@ ApiService.prototype.postWithAuth = async function (url, body = {}, headers = {}
     }
 };
 
+ApiService.prototype.patch = async function (url, body, headers, needAuth = false) {
+    try {
+        headers = await this.constructHeaders(needAuth, headers);
+        const options = { headers };
+        const res = await send(url, body, options, 'patch');
+        return res;
+    }
+    catch (err) {
+        throw constructErrorResponse(err, body);
+    }
+};
+
+
+ApiService.prototype.patchWithAuth = async function (url, body = {}, headers = {}) {
+    try {
+        const res = await this.patch(url, body, headers, true);
+        return res;
+    } catch (e) {
+        throw e;
+    }
+};
+
 const generateBasicAuth = (clientId, clientSecret) => {
     return Buffer.from(clientId + ":" + clientSecret).toString("base64");
 };
@@ -1551,7 +1628,7 @@ const send = (url, body, options, method = 'get') => {
             body,
             options,
             function (err, response, data) {
-                if (![201, 200].includes(response.statusCode)) {
+                if (![201, 200, 204].includes(response.statusCode)) {
                     const err = {
                         ...response.body,
                         statusCode: response.statusCode
@@ -1600,23 +1677,9 @@ module.exports = {
 const { BREAKDOWNLOOKUP } = require("./constants");
 
 exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
-    const currency = order.currencyCode || '';
-    let breakdown = addBreakdown(order);
-
-    if (order.items) {
-        const itemSum = (order.items || []).reduce((total, item) => {
-            const itemTotal = parseFloat(item.amount * item.quantity);
-            return parseFloat(total) + itemTotal;
-        }, 0);
-        breakdown = { ...breakdown, 'item_total': currency.getAmount(itemSum) };
-    }
-
     const shipping = getShipping(order);
     const items = getItems(order);
-    const amount = currency.getAmount(order.amount);
-
-    amount.breakdown = breakdown;
-    reconcileAmount(amount);
+    const amount = this.construsctOrderAmount(order);
     const purchaseUnit =
     {
         invoice_id: order.number,
@@ -1635,11 +1698,53 @@ exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
     };
 };
 
+function getItemTotal(order) {
+    const currency = order.currencyCode || '';
+    if (order.items) {
+        const itemSum = (order.items || []).reduce((total, item) => {
+            const itemTotal = parseFloat(item.amount * item.quantity);
+            return parseFloat(total) + itemTotal;
+        }, 0);
+        return { 'item_total': currency.getAmount(itemSum) };
+    }
+    return {};
+}
+
+function getBreakdown(order) {
+    let breakdown = {};
+    const keys = Object.keys(BREAKDOWNLOOKUP);
+    const currency = order.currencyCode || '';
+
+    keys.forEach(key => {
+        const value = BREAKDOWNLOOKUP[key];
+        const valueInOrder = order[value];
+
+        if (valueInOrder && valueInOrder >= 0) {
+            breakdown = { ...breakdown, [key]: currency.getAmount(valueInOrder) };
+        }
+    });
+    return breakdown;
+}
+
+exports.construsctOrderAmount = function (order) {
+    const currency = order.currencyCode || '';
+    const amount = currency.getAmount(order.amount);
+    amount.breakdown = { ...getBreakdown(order), ...getItemTotal(order) };
+    reconcileAmount(amount);
+    return amount;
+};
+
+const calculateBreakdown = function (total, key, breakdown) {
+    const value = parseFloat(breakdown[key].value);
+    return key.includes('discount') ? total -= value : total += value;
+};
+
 function reconcileAmount({ value: total, breakdown }) {
-    const sumOfBreakdown = Object.values(breakdown).reduce((a, c) => a + parseFloat(c.value), 0);
+    console.log({ breakdown });
+    const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown[BREAKDOWNLOOKUP.tax_total];
-    fieldToReconcile.value = parseFloat(keyToAdjust.value) + reminder;
+    const fieldToReconcile = breakdown.tax_total || Object.keys[0];
+    fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
 }
 
 function constructPaymentSource(returnUrl, cancelUrl) {
@@ -1651,22 +1756,6 @@ function constructPaymentSource(returnUrl, cancelUrl) {
             }
         }
     };
-}
-
-function addBreakdown(order) {
-    let breakdown = {};
-    const keys = Object.keys(BREAKDOWNLOOKUP);
-    const currency = order.currencyCode || '';
-
-    keys.forEach(key => {
-        const value = BREAKDOWNLOOKUP[key];
-        const valueInOrder = order[value];
-
-        if (valueInOrder) {
-            breakdown = { ...breakdown, [key]: currency.getAmount(valueInOrder) };
-        }
-    });
-    return breakdown;
 }
 
 String.prototype.getAmount = function (value) {

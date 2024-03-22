@@ -55,7 +55,7 @@ module.exports = {
 		var newStatus = { status: paymentConstants.NEW, amount: paymentAction.amount };
 		return newStatus;
 	},
-	generateResponseText({status, correlationId}) {
+	generateResponseText({ status, correlationId }) {
 		return `${status} ${correlationId ? ' - ' + correlationId : ''}`;
 	},
 	getPaymentResult: function (result, status, amount) {
@@ -181,7 +181,7 @@ module.exports = {
 			response.processingFailed = details.processingFailed;
 			return response;
 		}
-		return client.authorizePayment(details.token).
+		return client.authorizePayment(details.token, details).
 			then(function (result) {
 				return self.getPaymentResult(result, paymentConstants.AUTHORIZED, paymentAction.amount);
 			}, function (err) {

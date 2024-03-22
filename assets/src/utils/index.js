@@ -1,23 +1,9 @@
 const { BREAKDOWNLOOKUP } = require("./constants");
 
 exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
-    const currency = order.currencyCode || '';
-    let breakdown = addBreakdown(order);
-
-    if (order.items) {
-        const itemSum = (order.items || []).reduce((total, item) => {
-            const itemTotal = parseFloat(item.amount * item.quantity);
-            return parseFloat(total) + itemTotal;
-        }, 0);
-        breakdown = { ...breakdown, 'item_total': currency.getAmount(itemSum) };
-    }
-
     const shipping = getShipping(order);
     const items = getItems(order);
-    const amount = currency.getAmount(order.amount);
-
-    amount.breakdown = breakdown;
-    reconcileAmount(amount);
+    const amount = this.construsctOrderAmount(order);
     const purchaseUnit =
     {
         invoice_id: order.number,
@@ -36,11 +22,53 @@ exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
     };
 };
 
+function getItemTotal(order) {
+    const currency = order.currencyCode || '';
+    if (order.items) {
+        const itemSum = (order.items || []).reduce((total, item) => {
+            const itemTotal = parseFloat(item.amount * item.quantity);
+            return parseFloat(total) + itemTotal;
+        }, 0);
+        return { 'item_total': currency.getAmount(itemSum) };
+    }
+    return {};
+}
+
+function getBreakdown(order) {
+    let breakdown = {};
+    const keys = Object.keys(BREAKDOWNLOOKUP);
+    const currency = order.currencyCode || '';
+
+    keys.forEach(key => {
+        const value = BREAKDOWNLOOKUP[key];
+        const valueInOrder = order[value];
+
+        if (valueInOrder && valueInOrder >= 0) {
+            breakdown = { ...breakdown, [key]: currency.getAmount(valueInOrder) };
+        }
+    });
+    return breakdown;
+}
+
+exports.construsctOrderAmount = function (order) {
+    const currency = order.currencyCode || '';
+    const amount = currency.getAmount(order.amount);
+    amount.breakdown = { ...getBreakdown(order), ...getItemTotal(order) };
+    reconcileAmount(amount);
+    return amount;
+};
+
+const calculateBreakdown = function (total, key, breakdown) {
+    const value = parseFloat(breakdown[key].value);
+    return key.includes('discount') ? total -= value : total += value;
+};
+
 function reconcileAmount({ value: total, breakdown }) {
-    const sumOfBreakdown = Object.values(breakdown).reduce((a, c) => a + parseFloat(c.value), 0);
+    console.log({ breakdown });
+    const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown[BREAKDOWNLOOKUP.tax_total];
-    fieldToReconcile.value = parseFloat(keyToAdjust.value) + reminder;
+    const fieldToReconcile = breakdown.tax_total || Object.keys[0];
+    fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
 }
 
 function constructPaymentSource(returnUrl, cancelUrl) {
@@ -52,22 +80,6 @@ function constructPaymentSource(returnUrl, cancelUrl) {
             }
         }
     };
-}
-
-function addBreakdown(order) {
-    let breakdown = {};
-    const keys = Object.keys(BREAKDOWNLOOKUP);
-    const currency = order.currencyCode || '';
-
-    keys.forEach(key => {
-        const value = BREAKDOWNLOOKUP[key];
-        const valueInOrder = order[value];
-
-        if (valueInOrder) {
-            breakdown = { ...breakdown, [key]: currency.getAmount(valueInOrder) };
-        }
-    });
-    return breakdown;
 }
 
 String.prototype.getAmount = function (value) {

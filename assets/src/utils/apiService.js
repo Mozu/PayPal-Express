@@ -66,6 +66,28 @@ ApiService.prototype.postWithAuth = async function (url, body = {}, headers = {}
     }
 };
 
+ApiService.prototype.patch = async function (url, body, headers, needAuth = false) {
+    try {
+        headers = await this.constructHeaders(needAuth, headers);
+        const options = { headers };
+        const res = await send(url, body, options, 'patch');
+        return res;
+    }
+    catch (err) {
+        throw constructErrorResponse(err, body);
+    }
+};
+
+
+ApiService.prototype.patchWithAuth = async function (url, body = {}, headers = {}) {
+    try {
+        const res = await this.patch(url, body, headers, true);
+        return res;
+    } catch (e) {
+        throw e;
+    }
+};
+
 const generateBasicAuth = (clientId, clientSecret) => {
     return Buffer.from(clientId + ":" + clientSecret).toString("base64");
 };
@@ -112,7 +134,7 @@ const send = (url, body, options, method = 'get') => {
             body,
             options,
             function (err, response, data) {
-                if (![201, 200].includes(response.statusCode)) {
+                if (![201, 200, 204].includes(response.statusCode)) {
                     const err = {
                         ...response.body,
                         statusCode: response.statusCode
