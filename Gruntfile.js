@@ -7,6 +7,9 @@ module.exports = function (grunt) {
     grunt.initConfig({
         mozuconfig: grunt.file.readJSON('./mozu.config.json'),
         jshint: {
+            options: {
+                esversion: 9
+              },
             'normal': ['./assets/src/**/*.js'],
             'continuous': {
                 'options': { 'force': true },
@@ -24,6 +27,11 @@ module.exports = function (grunt) {
                         'extDot': 'last'
                     }],
                 'options': {
+                    // We may be need this later.
+                    // transform: [['babelify', { presets: ["@babel/preset-env"] }]],
+                    // plugin: [
+                    //     // [ require('esmify'), { /* ... options ... */ } ]
+                    //   ],
                     'browserifyOptions': {
                         'standalone': 'index',
                         'commondir': false,

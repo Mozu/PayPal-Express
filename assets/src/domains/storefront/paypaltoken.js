@@ -26,6 +26,7 @@ var helper = require('../../paypal/helper');
 
 module.exports = function(context, callback) {
   try {
+    console.log('trying to get token');
     paypal.getToken(context, callback)
     .then(function(data){
       context.response.body = data;
