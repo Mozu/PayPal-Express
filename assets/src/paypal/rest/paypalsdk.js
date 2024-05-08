@@ -1,4 +1,4 @@
-const { constructOrderDetails, getAmount, construsctOrderAmount } = require("../../utils");
+const { constructOrderDetails, getAmount, constructOrderAmount } = require("../../utils");
 const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
@@ -69,11 +69,12 @@ Paypal.prototype.authorizePayment = async function (id, order) {
     }
 };
 
-Paypal.prototype.captureAuthorizedPayment = async function (authId, amount, currencyCode, isPartial) {
+Paypal.prototype.captureAuthorizedPayment = async function (authId, orderNumber, amount, currencyCode, isPartial) {
     const url = `${this.paymentAuthUrl}/${authId}/capture`;
     const payload = {
         final_capture: isPartial,
-        amount: getAmount(amount, currencyCode)
+        amount: getAmount(amount, currencyCode),
+        invoice_id: orderNumber
     };
     try {
         const res = await this.apiWrapper.postWithAuth(url, payload);
@@ -97,7 +98,7 @@ Paypal.prototype.voidAuthorizedPayment = async function (authId) {
     }
 };
 
-Paypal.prototype.refundCapturePayment = async function (captureId) {
+Paypal.prototype.refundCapturedPayment = async function (captureId) {
     const url = `${this.paymentCaptureUrl}/${captureId}/refund`;
     try {
         const res = await this.apiWrapper.postWithAuth(url);
@@ -110,7 +111,7 @@ Paypal.prototype.refundCapturePayment = async function (captureId) {
 Paypal.prototype.updateOrder = async function (id, order) {
     try {
         const url = `${this.orderUrl}/${id}`;
-        const amount = construsctOrderAmount(order);
+        const amount = constructOrderAmount(order, true);
         const body = {
             op: 'replace',
             path: "/purchase_units/@reference_id=='default'/amount",

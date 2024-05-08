@@ -236,7 +236,9 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
 
+		var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
 		return client.captureAuthorizedPayment(paymentAuthorizationInteraction.gatewayTransactionId,
+			number,
 			paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function (captureResult) {
 				return self.getPaymentResult(captureResult, paymentConstants.CAPTURED, paymentAction.amount);
@@ -273,7 +275,7 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.refund)
 			paymentAction.amount = context.configuration.paypal.refund.amount;
 
-		return client.refundCapturePayment(capturedInteraction.gatewayTransactionId, paymentAction.amount, paymentAction.currencyCode).then(
+		return client.refundCapturedPayment(capturedInteraction.gatewayTransactionId, paymentAction.amount, paymentAction.currencyCode).then(
 			function (refundResult) {
 				return self.getPaymentResult(refundResult, paymentConstants.CREDITED, paymentAction.amount);
 			}, function (err) {

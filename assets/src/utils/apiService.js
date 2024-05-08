@@ -53,7 +53,7 @@ ApiService.prototype.post = async function (url, body, headers, needAuth = false
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -74,7 +74,7 @@ ApiService.prototype.patch = async function (url, body, headers, needAuth = fals
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -108,19 +108,18 @@ ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     return headers;
 };
 
-//Accepting body for testing.
-const constructErrorResponse = function (err, body) {
+const constructErrorResponse = function (err) {
     const { debug_id, message, error_description, details = {}, statusCode } = err;
     const { description } = (details ? details[0] : details) || {};
     return {
         correlationId: debug_id,
         statusCode,
-        errorMessage: description || error_description || message,
-        body
+        errorMessage: description || error_description || message
     };
 };
 
 const isJson = (options) => options.headers['Content-Type'] === 'application/json';
+
 // Needle wrapper to send request
 const send = (url, body, options, method = 'get') => {
     var promise = new Promise(function (resolve, reject) {

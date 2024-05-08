@@ -1,7 +1,7 @@
 module.exports = {
     URLS: {
         sandboxUrl: 'https://api-m.sandbox.paypal.com/',
-        prodUrl: '',
+        prodUrl: 'https://api-m.paypal.com/',
         orderUrlPrefix: 'v2/checkout/orders',
         paymentUrlPrefix: 'v2/payments',
         paymentAuthPrefix: '/authorizations',

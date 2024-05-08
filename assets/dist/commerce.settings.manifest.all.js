@@ -536,7 +536,9 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
 
+		var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
 		return client.captureAuthorizedPayment(paymentAuthorizationInteraction.gatewayTransactionId,
+			number,
 			paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function (captureResult) {
 				return self.getPaymentResult(captureResult, paymentConstants.CAPTURED, paymentAction.amount);
@@ -573,7 +575,7 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.refund)
 			paymentAction.amount = context.configuration.paypal.refund.amount;
 
-		return client.refundCapturePayment(capturedInteraction.gatewayTransactionId, paymentAction.amount, paymentAction.currencyCode).then(
+		return client.refundCapturedPayment(capturedInteraction.gatewayTransactionId, paymentAction.amount, paymentAction.currencyCode).then(
 			function (refundResult) {
 				return self.getPaymentResult(refundResult, paymentConstants.CREDITED, paymentAction.amount);
 			}, function (err) {
@@ -619,7 +621,7 @@ module.exports = {
 };
 
 },{"./constants":3,"./helper":4,"./rest/paypalsdk":6,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":195,"underscore":297}],6:[function(require,module,exports){
-const { constructOrderDetails, getAmount, construsctOrderAmount } = require("../../utils");
+const { constructOrderDetails, getAmount, constructOrderAmount } = require("../../utils");
 const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
@@ -690,11 +692,12 @@ Paypal.prototype.authorizePayment = async function (id, order) {
     }
 };
 
-Paypal.prototype.captureAuthorizedPayment = async function (authId, amount, currencyCode, isPartial) {
+Paypal.prototype.captureAuthorizedPayment = async function (authId, orderNumber, amount, currencyCode, isPartial) {
     const url = `${this.paymentAuthUrl}/${authId}/capture`;
     const payload = {
         final_capture: isPartial,
-        amount: getAmount(amount, currencyCode)
+        amount: getAmount(amount, currencyCode),
+        invoice_id: orderNumber
     };
     try {
         const res = await this.apiWrapper.postWithAuth(url, payload);
@@ -718,7 +721,7 @@ Paypal.prototype.voidAuthorizedPayment = async function (authId) {
     }
 };
 
-Paypal.prototype.refundCapturePayment = async function (captureId) {
+Paypal.prototype.refundCapturedPayment = async function (captureId) {
     const url = `${this.paymentCaptureUrl}/${captureId}/refund`;
     try {
         const res = await this.apiWrapper.postWithAuth(url);
@@ -731,7 +734,7 @@ Paypal.prototype.refundCapturePayment = async function (captureId) {
 Paypal.prototype.updateOrder = async function (id, order) {
     try {
         const url = `${this.orderUrl}/${id}`;
-        const amount = construsctOrderAmount(order);
+        const amount = constructOrderAmount(order, true);
         const body = {
             op: 'replace',
             path: "/purchase_units/@reference_id=='default'/amount",
@@ -744,44 +747,6 @@ Paypal.prototype.updateOrder = async function (id, order) {
         throw e;
     }
 };
-
-// executeflow = async () => {
-//     try {
-//         var clientId = "AdaIh11Rl_6gHSmZkCjUu0dGiXgnVjV50Zjb8OZz-Wod2GwSlHQSndcuxKYUKAgVIcMe4JI8xGXPZ_aU";
-//         var clientSecret = "ELyzjzLdYbLa61GUa91hdUvphaIEgk71UTzwb4SfUvlBMO2-V_UniWVLelios4f7rW7bDOi3yzJBEVUq";
-//         const pal = new Paypal(clientId, clientSecret, true);
-//         // const res = await pal.CreateOrder();
-//         // const res = await pal.getOrderDetails('68F07069KW0900007');
-//         const amount = {
-//             currency_code: "USD",
-//             value: "8.00",
-//             breakdown: {
-//                 shipping: {
-//                     currency_code: "USD",
-//                     value: "2.00"
-//                 },
-//                 tax_total: {
-//                     currency_code: "USD",
-//                     value: "2.00"
-//                 },
-//                 handling: {
-//                     currency_code: "USD",
-//                     value: "2.00"
-//                 },
-//                 item_total: {
-//                     currency_code: "USD",
-//                     value: "2.00"
-//                 }
-//             }
-//         }
-//         const res = await pal.updateOrder({}, '68F07069KW0900007', amount);
-//         console.log(res);
-//     } catch (e) {
-//         console.log(e);
-//     }
-// }
-
-// executeflow();
 
 exports.PaypalRestSdk = Paypal;
 },{"../../utils":9,"../../utils/apiService":7,"../../utils/constants":8}],7:[function(require,module,exports){
@@ -840,7 +805,7 @@ ApiService.prototype.post = async function (url, body, headers, needAuth = false
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -861,7 +826,7 @@ ApiService.prototype.patch = async function (url, body, headers, needAuth = fals
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -895,19 +860,18 @@ ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     return headers;
 };
 
-//Accepting body for testing.
-const constructErrorResponse = function (err, body) {
+const constructErrorResponse = function (err) {
     const { debug_id, message, error_description, details = {}, statusCode } = err;
     const { description } = (details ? details[0] : details) || {};
     return {
         correlationId: debug_id,
         statusCode,
-        errorMessage: description || error_description || message,
-        body
+        errorMessage: description || error_description || message
     };
 };
 
 const isJson = (options) => options.headers['Content-Type'] === 'application/json';
+
 // Needle wrapper to send request
 const send = (url, body, options, method = 'get') => {
     var promise = new Promise(function (resolve, reject) {
@@ -943,7 +907,7 @@ exports.ApiService = ApiService;
 module.exports = {
     URLS: {
         sandboxUrl: 'https://api-m.sandbox.paypal.com/',
-        prodUrl: '',
+        prodUrl: 'https://api-m.paypal.com/',
         orderUrlPrefix: 'v2/checkout/orders',
         paymentUrlPrefix: 'v2/payments',
         paymentAuthPrefix: '/authorizations',
@@ -972,7 +936,7 @@ const { BREAKDOWNLOOKUP } = require("./constants");
 exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
     const shipping = getShipping(order);
     const items = getItems(order);
-    const amount = this.construsctOrderAmount(order);
+    const amount = this.constructOrderAmount(order);
     const purchaseUnit =
     {
         invoice_id: order.number,
@@ -1019,11 +983,13 @@ function getBreakdown(order) {
     return breakdown;
 }
 
-exports.construsctOrderAmount = function (order) {
+exports.constructOrderAmount = function (order, recocile = false) {
     const currency = order.currencyCode || '';
     const amount = currency.getAmount(order.amount);
     amount.breakdown = { ...getBreakdown(order), ...getItemTotal(order) };
+    if(recocile) {
     reconcileAmount(amount);
+    }
     return amount;
 };
 
@@ -1036,7 +1002,7 @@ function reconcileAmount({ value: total, breakdown }) {
     console.log({ breakdown });
     const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown.tax_total || Object.keys[0];
+    const fieldToReconcile = breakdown.tax_total || Object.keys[breakdown][0];
     fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
 }
 

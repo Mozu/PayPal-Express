@@ -3,7 +3,7 @@ const { BREAKDOWNLOOKUP } = require("./constants");
 exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
     const shipping = getShipping(order);
     const items = getItems(order);
-    const amount = this.construsctOrderAmount(order);
+    const amount = this.constructOrderAmount(order);
     const purchaseUnit =
     {
         invoice_id: order.number,
@@ -50,11 +50,13 @@ function getBreakdown(order) {
     return breakdown;
 }
 
-exports.construsctOrderAmount = function (order) {
+exports.constructOrderAmount = function (order, recocile = false) {
     const currency = order.currencyCode || '';
     const amount = currency.getAmount(order.amount);
     amount.breakdown = { ...getBreakdown(order), ...getItemTotal(order) };
+    if(recocile) {
     reconcileAmount(amount);
+    }
     return amount;
 };
 
@@ -67,7 +69,7 @@ function reconcileAmount({ value: total, breakdown }) {
     console.log({ breakdown });
     const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown.tax_total || Object.keys[0];
+    const fieldToReconcile = breakdown.tax_total || Object.keys[breakdown][0];
     fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
 }
 
