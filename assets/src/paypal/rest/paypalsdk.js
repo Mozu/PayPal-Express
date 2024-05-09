@@ -2,8 +2,8 @@ const { constructOrderDetails, getAmount, constructOrderAmount } = require("../.
 const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
-function Paypal(clientId, clientSecret, sandbox = false) {
-    this.apiWrapper = new ApiService(clientId, clientSecret);
+function Paypal(paypalConfig, merchantId, sandbox = false) {
+    this.apiWrapper = new ApiService(paypalConfig, merchantId);
 
     const {
         sandboxUrl,

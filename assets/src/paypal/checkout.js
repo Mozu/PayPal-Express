@@ -342,7 +342,7 @@ module.exports = {
 				});
 			});
 		}).then(function(response) {
-			var client = paymentHelper.getPaypalClient(response.config);
+			var client = paymentHelper.getPaypalClient(response.config, context);
 			// client.setPayOptions(1,0,0);
 			console.log("configuration", context.configuration);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
@@ -398,7 +398,7 @@ module.exports = {
 			);
 		}).then(function(response) {
 			//get Paypal order details
-			var client = paymentHelper.getPaypalClient(response.config);
+			var client = paymentHelper.getPaypalClient(response.config, context);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
 
