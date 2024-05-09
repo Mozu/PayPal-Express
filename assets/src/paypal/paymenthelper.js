@@ -12,7 +12,7 @@ module.exports = {
 		});
 	},
 	getPaymentConfig: function (context) {
-		var self = this;
+ 		var self = this;
 		return helper.createClientFromContext(PaymentSettings, context, true)
 			.getThirdPartyPaymentWorkflowWithValues({ fullyQualifiedName: helper.getPaymentFQN(context) })
 			.then(function (paypalSettings) {
@@ -21,19 +21,19 @@ module.exports = {
 	},
 	getConfig: function (paypalSettings) {
 		return {
-			userName: helper.getValue(paypalSettings, paymentConstants.USERNAME),
-			password: helper.getValue(paypalSettings, paymentConstants.PASSWORD),
-			signature: helper.getValue(paypalSettings, paymentConstants.SIGNATURE),
 			environment: helper.getValue(paypalSettings, paymentConstants.ENVIRONMENT) || "sandbox",
 			merchantId: helper.getValue(paypalSettings, paymentConstants.MERCHANTACCOUNTID),
 			processingOption: helper.getValue(paypalSettings, paymentConstants.ORDERPROCESSING) || paymentConstants.CAPTUREONSHIPMENT,
-			enabled: paypalSettings.isEnabled
+			enabled: paypalSettings.isEnabled,
+			onboarded: helper.getValue(paypalSettings, paymentConstants.ONBOARDED),
+			trackingId: helper.getValue(paypalSettings, paymentConstants.TRACKINGID)
 		};
 	},
 
-	getPaypalClient: function (config) {
-		const { userName, password, environment } = config;
-		const paypalClient = new PaypalRestSdk(userName, password, environment === "sandbox");
+	getPaypalClient: function (config, context) {
+		const { merchantId, environment } = config;
+		const paypalConfig = context.getSecureAppData('paypalConfig');
+		const paypalClient = new PaypalRestSdk(paypalConfig, merchantId, environment === "sandbox");
 		return paypalClient;
 	},
 
@@ -45,9 +45,12 @@ module.exports = {
 
 		var config = self.getConfig(paypalSettings);
 
-		//TODO; need to change this validation.
-		if (!config.userName || !config.password || !config.environment) {
-			callback("Paypal Express - Environment/User Name/Password/Signatue/MerchantId fields are required.");
+		if (!config.environment) {
+			callback("Paypal Express - Environment fields are required.");
+			return;
+		}
+		if (!config.onboarded || config.onboarded == "false") {
+			callback("Paypal Express - Merchant must be onboarded.");
 			return;
 		}
 	},
@@ -170,7 +173,7 @@ module.exports = {
 			details.payerId = payment.billingInfo.data.paypal.payerId;
 		}
 
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
 			details.testAmount = context.configuration.paypal.authorization.amount;
 
@@ -230,7 +233,7 @@ module.exports = {
 			response.responseCode = 500;
 			return Promise.resolve(response);
 		}
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 		var isPartial = true;
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
@@ -269,7 +272,7 @@ module.exports = {
 			return { status: paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Cannot credit or refund on manual capture." };
 
 		var fullRefund = paymentAction.amount === capturedInteraction.amount;
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.refund)
 			paymentAction.amount = context.configuration.paypal.refund.amount;
@@ -302,7 +305,7 @@ module.exports = {
 
 		if (!authorizedInteraction || context.get.isVoidActionNoOp())
 			return { status: paymentConstants.VOIDED, amount: paymentAction.amount };
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.void)
 			authorizedInteraction.gatewayTransactionId = context.configuration.paypal.void.authorizationId;

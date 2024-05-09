@@ -1,10 +1,12 @@
 module.exports = {
-	PAYMENTSETTINGID: "PayPalExpress2",
+	PAYMENTSETTINGID: "PayPalMultiparty", // Major Version 3, Multiparty implementation
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
 	SIGNATURE: "signature",
 	MERCHANTACCOUNTID: "merchantAccountId",
+	ONBOARDED: "onboarded",
+	TRACKINGID: "trackingId",
 	CAPTUREONSUBMIT: "AuthAndCaptureOnOrderPlacement",
 	CAPTUREONSHIPMENT: "AuthOnOrderPlacementAndCaptureOnOrderShipment",
 	ORDERPROCESSING: "orderProcessing",

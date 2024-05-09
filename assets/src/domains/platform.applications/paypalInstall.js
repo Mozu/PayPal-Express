@@ -29,7 +29,6 @@ function AppInstall(context, callback) {
     try {
       console.log("Installing PayPal Express payment settings", tenant);
 
-
       var tasks = tenant.sites.map(
               function(site) {
                 return addUpdatePaymentSettings(context, site);
@@ -151,11 +150,10 @@ function AppInstall(context, callback) {
         "description" : "<div style='font-size:13px;font-style:italic'>Please review our <a style='color:blue;' target='mozupaypalhelp' href='http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm'>Help</a> documentation to configure Paypal Express</div>",
         "credentials":  [
             getPaymentActionFieldDef("Environment", paymentConstants.ENVIRONMENT, "RadioButton", false,getEnvironmentVocabularyValues(), existingSettings),
-            getPaymentActionFieldDef("User Name", paymentConstants.USERNAME, "TextBox", true,null,existingSettings),
-            getPaymentActionFieldDef("Password", paymentConstants.PASSWORD, "TextBox", true,null,existingSettings),
-            getPaymentActionFieldDef("Signature", paymentConstants.SIGNATURE, "TextBox", true,null,existingSettings),
-            getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "TextBox", false,null,existingSettings),
-            getPaymentActionFieldDef("Order Processing", paymentConstants.ORDERPROCESSING, "RadioButton", false,getOrderProcessingVocabularyValues(),existingSettings)
+            getPaymentActionFieldDef("Order Processing", paymentConstants.ORDERPROCESSING, "RadioButton", false,getOrderProcessingVocabularyValues(),existingSettings),
+            getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "Hidden", false, null, existingSettings),
+            getPaymentActionFieldDef("Onboarded", paymentConstants.ONBOARDED, "Hidden", false, null, existingSettings),
+            getPaymentActionFieldDef("Tracking ID", paymentConstants.TRACKINGID, "Hidden", false, null, existingSettings),
           ]
       };
   }
