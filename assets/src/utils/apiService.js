@@ -32,7 +32,6 @@ ApiService.prototype.generateToken = async function () {
 ApiService.prototype.generateAuthAssertion = function () {
   const auth1 = Buffer.from('{"alg":"none"}').toString("base64");
   const auth2 = Buffer.from(`{"iss":${this.clientId},"payer_id":${this.merchantId}}`).toString("base64");
-  const authAss = `${auth1}.${auth2}.`;
   return `${auth1}.${auth2}.`;
 };
 
