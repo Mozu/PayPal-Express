@@ -689,12 +689,14 @@ module.exports = {
 
 },{"./constants":5,"./helper":6,"./paymenthelper":7,"mozu-node-sdk/clients/commerce/cart":194,"mozu-node-sdk/clients/commerce/checkout":195,"mozu-node-sdk/clients/commerce/checkouts/destination":196,"mozu-node-sdk/clients/commerce/checkouts/orderItem":197,"mozu-node-sdk/clients/commerce/checkouts/payment":198,"mozu-node-sdk/clients/commerce/order":199,"mozu-node-sdk/clients/commerce/orders/fulfillmentInfo":200,"mozu-node-sdk/clients/commerce/orders/payment":201,"mozu-node-sdk/clients/commerce/orders/shipment":202,"mozu-node-sdk/clients/commerce/settings/generalSettings":204,"mozu-node-sdk/constants":209,"underscore":306}],5:[function(require,module,exports){
 module.exports = {
-	PAYMENTSETTINGID: "PayPalExpress2",
+	PAYMENTSETTINGID: "PayPalExpress3", // Major Version 3, Multiparty implementation
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
 	SIGNATURE: "signature",
 	MERCHANTACCOUNTID: "merchantAccountId",
+	ONBOARDED: "onboarded",
+	TRACKINGID: "trackingId",
 	CAPTUREONSUBMIT: "AuthAndCaptureOnOrderPlacement",
 	CAPTUREONSHIPMENT: "AuthOnOrderPlacementAndCaptureOnOrderShipment",
 	ORDERPROCESSING: "orderProcessing",
@@ -971,13 +973,12 @@ module.exports = {
 	},
 	getConfig: function (paypalSettings) {
 		return {
-			userName: helper.getValue(paypalSettings, paymentConstants.USERNAME),
-			password: helper.getValue(paypalSettings, paymentConstants.PASSWORD),
-			signature: helper.getValue(paypalSettings, paymentConstants.SIGNATURE),
 			environment: helper.getValue(paypalSettings, paymentConstants.ENVIRONMENT) || "sandbox",
 			merchantId: helper.getValue(paypalSettings, paymentConstants.MERCHANTACCOUNTID),
 			processingOption: helper.getValue(paypalSettings, paymentConstants.ORDERPROCESSING) || paymentConstants.CAPTUREONSHIPMENT,
-			enabled: paypalSettings.isEnabled
+			enabled: paypalSettings.isEnabled,
+			onboarded: helper.getValue(paypalSettings, paymentConstants.ONBOARDED),
+			trackingId: helper.getValue(paypalSettings, paymentConstants.TRACKINGID)
 		};
 	},
 
@@ -996,9 +997,12 @@ module.exports = {
 
 		var config = self.getConfig(paypalSettings);
 
-		//TODO; need to change this validation.
-		if (!config.userName || !config.password || !config.environment) {
-			callback("Paypal Express - Environment/User Name/Password/Signatue/MerchantId fields are required.");
+		if (!config.environment) {
+			callback("Paypal Express - Environment fields are required.");
+			return;
+		}
+		if (!config.onboarded || config.onboarded == "false") {
+			callback("Paypal Express - Merchant must be onboarded.");
 			return;
 		}
 	},
@@ -1437,8 +1441,6 @@ ApiService.prototype.generateToken = async function () {
 };
 
 // See "Generate PayPal-Auth-Assertion header" section https://developer.paypal.com/docs/multiparty/checkout/immediate-capture/
-// This header allows our "third party" app to authorize against client's "first party" account
-// eg) if first party created order, this header lets our third party access the order assuming first party is onboarded
 ApiService.prototype.generateAuthAssertion = function () {
   const auth1 = Buffer.from('{"alg":"none"}').toString("base64");
   const auth2 = Buffer.from(`{"iss":${this.clientId},"payer_id":${this.merchantId}}`).toString("base64");
@@ -1514,6 +1516,9 @@ const generateBasicAuth = (clientId, clientSecret) => {
     return Buffer.from(clientId + ":" + clientSecret).toString("base64");
 };
 
+// 'PayPal-Auth-Assertion' determines which of our client's Merchant Accounts the request is for and authorizes for it
+//     eg) it determines which merchant account the order will be created for and which party is the order.purchase_units.payee on it
+//     Clients can use their own Merchant Account Authorization to get orders we create, capture payments we authorize, etc when we authorize in this manner
 const getAuthHeaders = function (token, authAssertion, contentType = 'application/json') {
     return {
         'Authorization': `Bearer ${token}`,
