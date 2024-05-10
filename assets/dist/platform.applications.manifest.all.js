@@ -89,6 +89,7 @@ function AppInstall(context, callback) {
 
 
   function addUpdatePaymentSettings(context, site) {
+    console.log("Adding payment settings for site", site.id);
     var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
     paymentSettingsClient.context[constants.headers.SITE] = site.id;
     //GetExisting
@@ -143,16 +144,6 @@ function AppInstall(context, callback) {
 
 
   function getPaymentDef(existingSettings) {
-    //This extra credential 'paypalMultiparty' tells other services this thirdpartyworkflow is for PayPal Multiparty and which SecureAppData to find Partner Credentials in
-    const paypalMultipartyAppKey = {
-      "displayName": paymentConstants.PAYPALMULTIPARTYAPPKEY,
-      "apiName": paymentConstants.PAYPALMULTIPARTYAPPKEY,
-      "inputType": "Hidden",
-      "isSensitive": false,
-      "vocabularyValues": null,
-      "value": paymentConstants.PAYPALMULTIPARTYAPPKEYVALUE
-    };
-
     return {
         "name": paymentConstants.PAYMENTSETTINGID,
         "namespace": context.get.nameSpace(),
@@ -164,7 +155,6 @@ function AppInstall(context, callback) {
             getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "Hidden", false, null, existingSettings),
             getPaymentActionFieldDef("Onboarded", paymentConstants.ONBOARDED, "Hidden", false, null, existingSettings),
             getPaymentActionFieldDef("Tracking ID", paymentConstants.TRACKINGID, "Hidden", false, null, existingSettings),
-            paypalMultipartyAppKey,
           ]
       };
   }
@@ -239,9 +229,7 @@ module.exports = function(context, callback) {
 
 },{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":40,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":47,"mozu-node-sdk/clients/commerce/settings/general/customRouteSettings":48,"mozu-node-sdk/constants":51,"underscore":113}],2:[function(require,module,exports){
 module.exports = {
-	PAYMENTSETTINGID: "PayPal Complete Payments Application", // ThirdPartyWorkflow Name, affects name displayed in Admin UI > Settings > Payment Types
-	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
-	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.PayPalMultiparty.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+	PAYMENTSETTINGID: "PayPalExpress3", // Major Version 3, Multiparty implementation
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
