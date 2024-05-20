@@ -39,7 +39,9 @@ module.exports = function(context, callback) {
 };
 },{"../../paypal/paymenthelper":5}],3:[function(require,module,exports){
 module.exports = {
-	PAYMENTSETTINGID: "PayPalMultiparty", // Major Version 3, Multiparty implementation
+	PAYMENTSETTINGID: "PayPal Complete Payments Application", // ThirdPartyWorkflow Name, affects name displayed in Admin UI > Settings > Payment Types
+	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
+	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.PayPalMultiparty.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
