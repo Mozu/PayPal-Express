@@ -88,7 +88,6 @@ function AppInstall(context, callback) {
 
 
   function addUpdatePaymentSettings(context, site) {
-    console.log("Adding payment settings for site", site.id);
     var paymentSettingsClient = require("mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings")();
     paymentSettingsClient.context[constants.headers.SITE] = site.id;
     //GetExisting
@@ -143,6 +142,16 @@ function AppInstall(context, callback) {
 
 
   function getPaymentDef(existingSettings) {
+    //This extra credential 'paypalMultiparty' tells other services this thirdpartyworkflow is for PayPal Multiparty and which SecureAppData to find Partner Credentials in
+    const paypalMultipartyAppKey = {
+      "displayName": paymentConstants.PAYPALMULTIPARTYAPPKEY,
+      "apiName": paymentConstants.PAYPALMULTIPARTYAPPKEY,
+      "inputType": "Hidden",
+      "isSensitive": false,
+      "vocabularyValues": null,
+      "value": paymentConstants.PAYPALMULTIPARTYAPPKEYVALUE
+    };
+
     return {
         "name": paymentConstants.PAYMENTSETTINGID,
         "namespace": context.get.nameSpace(),
@@ -154,6 +163,7 @@ function AppInstall(context, callback) {
             getPaymentActionFieldDef("Merchant account ID", paymentConstants.MERCHANTACCOUNTID, "Hidden", false, null, existingSettings),
             getPaymentActionFieldDef("Onboarded", paymentConstants.ONBOARDED, "Hidden", false, null, existingSettings),
             getPaymentActionFieldDef("Tracking ID", paymentConstants.TRACKINGID, "Hidden", false, null, existingSettings),
+            paypalMultipartyAppKey,
           ]
       };
   }
