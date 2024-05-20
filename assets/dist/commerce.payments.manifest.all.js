@@ -689,7 +689,9 @@ module.exports = {
 
 },{"./constants":5,"./helper":6,"./paymenthelper":7,"mozu-node-sdk/clients/commerce/cart":194,"mozu-node-sdk/clients/commerce/checkout":195,"mozu-node-sdk/clients/commerce/checkouts/destination":196,"mozu-node-sdk/clients/commerce/checkouts/orderItem":197,"mozu-node-sdk/clients/commerce/checkouts/payment":198,"mozu-node-sdk/clients/commerce/order":199,"mozu-node-sdk/clients/commerce/orders/fulfillmentInfo":200,"mozu-node-sdk/clients/commerce/orders/payment":201,"mozu-node-sdk/clients/commerce/orders/shipment":202,"mozu-node-sdk/clients/commerce/settings/generalSettings":204,"mozu-node-sdk/constants":209,"underscore":306}],5:[function(require,module,exports){
 module.exports = {
-	PAYMENTSETTINGID: "PayPalExpress3", // Major Version 3, Multiparty implementation
+	PAYMENTSETTINGID: "PayPal Complete Payments Application", // ThirdPartyWorkflow Name, affects name displayed in Admin UI > Settings > Payment Types
+	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
+	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.PayPalMultiparty.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
