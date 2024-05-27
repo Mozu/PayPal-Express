@@ -212,16 +212,15 @@ module.exports = {
 		var isMultishipEnabled = context.get.isForCheckout();
 		console.log('isMultiship enabled', isMultishipEnabled);
 		var order = isMultishipEnabled ? context.get.checkout() : context.get.order();
-
 		if (paymentAction.manualGatewayInteraction) {
-			console.log("Manual capture...dont send to amazon");
+			console.log("Manual capture...dont send to paypal");
 			response.status = paymentConstants.CAPTURED;
 			response.transactionId = paymentAction.manualGatewayInteraction.gatewayInteractionId;
 			return Promise.resolve(response);
 		}
 
 		var interactions = payment.interactions;
-
+		var orderId = interactions && interactions.length > 0 ? interactions[0].orderId : null;
 		var paymentAuthorizationInteraction = self.getInteractionByStatus(interactions, paymentConstants.AUTHORIZED);
 
 		console.log("Authorized interaction", paymentAuthorizationInteraction);
@@ -236,9 +235,9 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
 
-		var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
+		
 		return client.captureAuthorizedPayment(paymentAuthorizationInteraction.gatewayTransactionId,
-			number,
+			orderId,
 			paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function (captureResult) {
 				return self.getPaymentResult(captureResult, paymentConstants.CAPTURED, paymentAction.amount);

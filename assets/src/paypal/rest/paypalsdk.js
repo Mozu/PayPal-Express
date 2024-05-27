@@ -7,14 +7,14 @@ function Paypal(clientId, clientSecret, sandbox = false) {
 
     const {
         sandboxUrl,
-        prodUrl,
+        productionUrl,
         orderUrlPrefix,
         paymentAuthPrefix,
         paymentCapturePrefix,
         paymentUrlPrefix
     } = URLS;
 
-    const baseUrl = sandbox ? sandboxUrl : prodUrl;
+    const baseUrl = sandbox ? sandboxUrl : productionUrl;
     const paymentUrl = baseUrl + paymentUrlPrefix;
 
     this.orderUrl = baseUrl + orderUrlPrefix;
@@ -69,12 +69,12 @@ Paypal.prototype.authorizePayment = async function (id, order) {
     }
 };
 
-Paypal.prototype.captureAuthorizedPayment = async function (authId, orderNumber, amount, currencyCode, isPartial) {
+Paypal.prototype.captureAuthorizedPayment = async function (authId, orderId, amount, currencyCode, isPartial) {
     const url = `${this.paymentAuthUrl}/${authId}/capture`;
     const payload = {
         final_capture: isPartial,
         amount: getAmount(amount, currencyCode),
-        invoice_id: orderNumber
+        invoice_id: orderId
     };
     try {
         const res = await this.apiWrapper.postWithAuth(url, payload);
@@ -108,6 +108,14 @@ Paypal.prototype.refundCapturedPayment = async function (captureId) {
     }
 };
 
+// This method is used to update breakdown of the amount.
+// While creating the token(createOrder) we are not getting shipping, handling,
+// discount etc..
+// but we are getting this while capturing the payment.
+// Which leads to difference in amount.
+// As per the paypal docs capture payment amount should not be greater than 105%
+// of the order amount(create order in paypal)
+// That's why we need to update breakdown in authorize call.
 Paypal.prototype.updateOrder = async function (id, order) {
     try {
         const url = `${this.orderUrl}/${id}`;

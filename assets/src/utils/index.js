@@ -65,12 +65,23 @@ const calculateBreakdown = function (total, key, breakdown) {
     return key.includes('discount') ? total -= value : total += value;
 };
 
+//Handle Penny difference.
+//TODO: optimize this function
 function reconcileAmount({ value: total, breakdown }) {
     console.log({ breakdown });
-    const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
+    const breakdownKeys = Object.keys(breakdown);
+    const sumOfBreakdown = breakdownKeys.reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown.tax_total || Object.keys[breakdown][0];
-    fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
+    if(reminder === 0) return;
+
+    //TODO: Need to re-visit this.
+    // Add reminder in order fields except item_total and discount amount.
+    const key = breakdownKeys
+                            .filter(x =>  x !== BREAKDOWNLOOKUP.item_total || x != BREAKDOWNLOOKUP.shipping_discount)
+                            .find(v => breakdown[v] > 0);
+
+    const fieldToReconcile = breakdown[key] || breakdown[0];
+    fieldToReconcile.value = Math.max(parseFloat(fieldToReconcile.value) + reminder, 0);
 }
 
 function constructPaymentSource(returnUrl, cancelUrl) {

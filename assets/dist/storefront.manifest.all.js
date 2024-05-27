@@ -1196,16 +1196,15 @@ module.exports = {
 		var isMultishipEnabled = context.get.isForCheckout();
 		console.log('isMultiship enabled', isMultishipEnabled);
 		var order = isMultishipEnabled ? context.get.checkout() : context.get.order();
-
 		if (paymentAction.manualGatewayInteraction) {
-			console.log("Manual capture...dont send to amazon");
+			console.log("Manual capture...dont send to paypal");
 			response.status = paymentConstants.CAPTURED;
 			response.transactionId = paymentAction.manualGatewayInteraction.gatewayInteractionId;
 			return Promise.resolve(response);
 		}
 
 		var interactions = payment.interactions;
-
+		var orderId = interactions && interactions.length > 0 ? interactions[0].orderId : null;
 		var paymentAuthorizationInteraction = self.getInteractionByStatus(interactions, paymentConstants.AUTHORIZED);
 
 		console.log("Authorized interaction", paymentAuthorizationInteraction);
@@ -1220,9 +1219,9 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
 
-		var number = isMultishipEnabled ? (paymentAuthorizationInteraction.target ? paymentAuthorizationInteraction.target.targetNumber : order.orderNumber) : order.orderNumber;
+		
 		return client.captureAuthorizedPayment(paymentAuthorizationInteraction.gatewayTransactionId,
-			number,
+			orderId,
 			paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function (captureResult) {
 				return self.getPaymentResult(captureResult, paymentConstants.CAPTURED, paymentAction.amount);
@@ -1314,14 +1313,14 @@ function Paypal(clientId, clientSecret, sandbox = false) {
 
     const {
         sandboxUrl,
-        prodUrl,
+        productionUrl,
         orderUrlPrefix,
         paymentAuthPrefix,
         paymentCapturePrefix,
         paymentUrlPrefix
     } = URLS;
 
-    const baseUrl = sandbox ? sandboxUrl : prodUrl;
+    const baseUrl = sandbox ? sandboxUrl : productionUrl;
     const paymentUrl = baseUrl + paymentUrlPrefix;
 
     this.orderUrl = baseUrl + orderUrlPrefix;
@@ -1376,12 +1375,12 @@ Paypal.prototype.authorizePayment = async function (id, order) {
     }
 };
 
-Paypal.prototype.captureAuthorizedPayment = async function (authId, orderNumber, amount, currencyCode, isPartial) {
+Paypal.prototype.captureAuthorizedPayment = async function (authId, orderId, amount, currencyCode, isPartial) {
     const url = `${this.paymentAuthUrl}/${authId}/capture`;
     const payload = {
         final_capture: isPartial,
         amount: getAmount(amount, currencyCode),
-        invoice_id: orderNumber
+        invoice_id: orderId
     };
     try {
         const res = await this.apiWrapper.postWithAuth(url, payload);
@@ -1415,6 +1414,14 @@ Paypal.prototype.refundCapturedPayment = async function (captureId) {
     }
 };
 
+// This method is used to update breakdown of the amount.
+// While creating the token(createOrder) we are not getting shipping, handling,
+// discount etc..
+// but we are getting this while capturing the payment.
+// Which leads to difference in amount.
+// As per the paypal docs capture payment amount should not be greater than 105%
+// of the order amount(create order in paypal)
+// That's why we need to update breakdown in authorize call.
 Paypal.prototype.updateOrder = async function (id, order) {
     try {
         const url = `${this.orderUrl}/${id}`;
@@ -1614,7 +1621,7 @@ exports.ApiService = ApiService;
 module.exports = {
     URLS: {
         sandboxUrl: 'https://api-m.sandbox.paypal.com/',
-        prodUrl: 'https://api-m.paypal.com/',
+        productionUrl: 'https://api-m.paypal.com/',
         orderUrlPrefix: 'v2/checkout/orders',
         paymentUrlPrefix: 'v2/payments',
         paymentAuthPrefix: '/authorizations',
@@ -1705,12 +1712,23 @@ const calculateBreakdown = function (total, key, breakdown) {
     return key.includes('discount') ? total -= value : total += value;
 };
 
+//Handle Penny difference.
+//TODO: optimize this function
 function reconcileAmount({ value: total, breakdown }) {
     console.log({ breakdown });
-    const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
+    const breakdownKeys = Object.keys(breakdown);
+    const sumOfBreakdown = breakdownKeys.reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown.tax_total || Object.keys[breakdown][0];
-    fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
+    if(reminder === 0) return;
+
+    //TODO: Need to re-visit this.
+    // Add reminder in order fields except item_total and discount amount.
+    const key = breakdownKeys
+                            .filter(x =>  x !== BREAKDOWNLOOKUP.item_total || x != BREAKDOWNLOOKUP.shipping_discount)
+                            .find(v => breakdown[v] > 0);
+
+    const fieldToReconcile = breakdown[key] || breakdown[0];
+    fieldToReconcile.value = Math.max(parseFloat(fieldToReconcile.value) + reminder, 0);
 }
 
 function constructPaymentSource(returnUrl, cancelUrl) {
