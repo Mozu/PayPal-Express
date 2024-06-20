@@ -1282,7 +1282,7 @@ const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
 function Paypal(paypalConfig, merchantId, sandbox = false) {
-    this.apiWrapper = new ApiService(paypalConfig, merchantId);
+    this.apiWrapper = new ApiService(paypalConfig, merchantId, sandbox);
 
     const {
         sandboxUrl,
@@ -1417,10 +1417,10 @@ exports.PaypalRestSdk = Paypal;
 const needle = require("needle");
 const { URLS } = require("./constants");
 
-function ApiService(config, merchantId) {
-    this.clientId = config.clientId; // Kibo's Partner Account clientId
-    this.clientSecret = config.clientSecret; // Kibo's Partner Account secret
-    this.bnCode = config.bnCode; // Kibo's Partner Account BN Code
+function ApiService(config, merchantId, isSandbox) {
+    this.clientId = isSandbox ? config.sbxClientId : config.prodClientId; // Kibo's Partner Account clientId
+    this.clientSecret = isSandbox ? config.sbxClientSecret : config.prodClientId; // Kibo's Partner Account secret
+    this.bnCode = isSandbox ? config.sbxBnCode : config.prodBnCode; // Kibo's Partner Account BN Code
     this.merchantId = merchantId; // Client's Merchant Account Id
 }
 
