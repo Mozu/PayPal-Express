@@ -39,9 +39,9 @@ module.exports = function(context, callback) {
 };
 },{"../../paypal/paymenthelper":5}],3:[function(require,module,exports){
 module.exports = {
-	PAYMENTSETTINGID: "PayPal Complete Payments Application", // ThirdPartyWorkflow Name, affects name displayed in Admin UI > Settings > Payment Types
+  PAYMENTSETTINGID: "paypal_complete_payments_application", // Must match your DevCenter App's AppKey
 	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
-	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.PayPalMultiparty.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
@@ -519,16 +519,15 @@ module.exports = {
 		var isMultishipEnabled = context.get.isForCheckout();
 		console.log('isMultiship enabled', isMultishipEnabled);
 		var order = isMultishipEnabled ? context.get.checkout() : context.get.order();
-
 		if (paymentAction.manualGatewayInteraction) {
-			console.log("Manual capture...dont send to amazon");
+			console.log("Manual capture...dont send to paypal");
 			response.status = paymentConstants.CAPTURED;
 			response.transactionId = paymentAction.manualGatewayInteraction.gatewayInteractionId;
 			return Promise.resolve(response);
 		}
 
 		var interactions = payment.interactions;
-
+		var orderId = interactions && interactions.length > 0 ? interactions[0].orderId : null;
 		var paymentAuthorizationInteraction = self.getInteractionByStatus(interactions, paymentConstants.AUTHORIZED);
 
 		console.log("Authorized interaction", paymentAuthorizationInteraction);
@@ -543,7 +542,9 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
 
+		
 		return client.captureAuthorizedPayment(paymentAuthorizationInteraction.gatewayTransactionId,
+			orderId,
 			paymentAction.amount, paymentAction.currencyCode, isPartial)
 			.then(function (captureResult) {
 				return self.getPaymentResult(captureResult, paymentConstants.CAPTURED, paymentAction.amount);
@@ -580,7 +581,7 @@ module.exports = {
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.refund)
 			paymentAction.amount = context.configuration.paypal.refund.amount;
 
-		return client.refundCapturePayment(capturedInteraction.gatewayTransactionId, paymentAction.amount, paymentAction.currencyCode).then(
+		return client.refundCapturedPayment(capturedInteraction.gatewayTransactionId, paymentAction.amount, paymentAction.currencyCode).then(
 			function (refundResult) {
 				return self.getPaymentResult(refundResult, paymentConstants.CREDITED, paymentAction.amount);
 			}, function (err) {
@@ -626,23 +627,23 @@ module.exports = {
 };
 
 },{"./constants":3,"./helper":4,"./rest/paypalsdk":6,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":173,"underscore":273}],6:[function(require,module,exports){
-const { constructOrderDetails, getAmount, construsctOrderAmount } = require("../../utils");
+const { constructOrderDetails, getAmount, constructOrderAmount } = require("../../utils");
 const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
 function Paypal(paypalConfig, merchantId, sandbox = false) {
-    this.apiWrapper = new ApiService(paypalConfig, merchantId);
+    this.apiWrapper = new ApiService(paypalConfig, merchantId, sandbox);
 
     const {
         sandboxUrl,
-        prodUrl,
+        productionUrl,
         orderUrlPrefix,
         paymentAuthPrefix,
         paymentCapturePrefix,
         paymentUrlPrefix
     } = URLS;
 
-    const baseUrl = sandbox ? sandboxUrl : prodUrl;
+    const baseUrl = sandbox ? sandboxUrl : productionUrl;
     const paymentUrl = baseUrl + paymentUrlPrefix;
 
     this.orderUrl = baseUrl + orderUrlPrefix;
@@ -697,11 +698,12 @@ Paypal.prototype.authorizePayment = async function (id, order) {
     }
 };
 
-Paypal.prototype.captureAuthorizedPayment = async function (authId, amount, currencyCode, isPartial) {
+Paypal.prototype.captureAuthorizedPayment = async function (authId, orderId, amount, currencyCode, isPartial) {
     const url = `${this.paymentAuthUrl}/${authId}/capture`;
     const payload = {
         final_capture: isPartial,
-        amount: getAmount(amount, currencyCode)
+        amount: getAmount(amount, currencyCode),
+        invoice_id: orderId
     };
     try {
         const res = await this.apiWrapper.postWithAuth(url, payload);
@@ -725,7 +727,7 @@ Paypal.prototype.voidAuthorizedPayment = async function (authId) {
     }
 };
 
-Paypal.prototype.refundCapturePayment = async function (captureId) {
+Paypal.prototype.refundCapturedPayment = async function (captureId) {
     const url = `${this.paymentCaptureUrl}/${captureId}/refund`;
     try {
         const res = await this.apiWrapper.postWithAuth(url);
@@ -735,10 +737,18 @@ Paypal.prototype.refundCapturePayment = async function (captureId) {
     }
 };
 
+// This method is used to update breakdown of the amount.
+// While creating the token(createOrder) we are not getting shipping, handling,
+// discount etc..
+// but we are getting this while capturing the payment.
+// Which leads to difference in amount.
+// As per the paypal docs capture payment amount should not be greater than 105%
+// of the order amount(create order in paypal)
+// That's why we need to update breakdown in authorize call.
 Paypal.prototype.updateOrder = async function (id, order) {
     try {
         const url = `${this.orderUrl}/${id}`;
-        const amount = construsctOrderAmount(order);
+        const amount = constructOrderAmount(order, true);
         const body = {
             op: 'replace',
             path: "/purchase_units/@reference_id=='default'/amount",
@@ -758,10 +768,10 @@ exports.PaypalRestSdk = Paypal;
 const needle = require("needle");
 const { URLS } = require("./constants");
 
-function ApiService(config, merchantId) {
-    this.clientId = config.clientId; // Kibo's Partner Account clientId
-    this.clientSecret = config.clientSecret; // Kibo's Partner Account secret
-    this.bnCode = config.bnCode; // Kibo's Partner Account BN Code
+function ApiService(config, merchantId, isSandbox) {
+    this.clientId = isSandbox ? config.sbxClientId : config.prodClientId; // Kibo's Partner Account clientId
+    this.clientSecret = isSandbox ? config.sbxClientSecret : config.prodClientId; // Kibo's Partner Account secret
+    this.bnCode = isSandbox ? config.sbxBnCode : config.prodBnCode; // Kibo's Partner Account BN Code
     this.merchantId = merchantId; // Client's Merchant Account Id
 }
 
@@ -820,7 +830,7 @@ ApiService.prototype.post = async function (url, body, headers, needAuth = false
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -841,7 +851,7 @@ ApiService.prototype.patch = async function (url, body, headers, needAuth = fals
         return res;
     }
     catch (err) {
-        throw constructErrorResponse(err, body);
+        throw constructErrorResponse(err);
     }
 };
 
@@ -889,19 +899,18 @@ ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     return headers;
 };
 
-//Accepting body for testing.
-const constructErrorResponse = function (err, body) {
+const constructErrorResponse = function (err) {
     const { debug_id, message, error_description, details = {}, statusCode } = err;
     const { description } = (details ? details[0] : details) || {};
     return {
         correlationId: debug_id,
         statusCode,
-        errorMessage: description || error_description || message,
-        body
+        errorMessage: description || error_description || message
     };
 };
 
 const isJson = (options) => options.headers['Content-Type'] === 'application/json';
+
 // Needle wrapper to send request
 const send = (url, body, options, method = 'get') => {
     var promise = new Promise(function (resolve, reject) {
@@ -938,7 +947,7 @@ exports.ApiService = ApiService;
 module.exports = {
     URLS: {
         sandboxUrl: 'https://api-m.sandbox.paypal.com/',
-        prodUrl: '',
+        productionUrl: 'https://api-m.paypal.com/',
         orderUrlPrefix: 'v2/checkout/orders',
         paymentUrlPrefix: 'v2/payments',
         paymentAuthPrefix: '/authorizations',
@@ -967,7 +976,7 @@ const { BREAKDOWNLOOKUP } = require("./constants");
 exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
     const shipping = getShipping(order);
     const items = getItems(order);
-    const amount = this.construsctOrderAmount(order);
+    const amount = this.constructOrderAmount(order);
     const purchaseUnit =
     {
         invoice_id: order.number,
@@ -1014,11 +1023,13 @@ function getBreakdown(order) {
     return breakdown;
 }
 
-exports.construsctOrderAmount = function (order) {
+exports.constructOrderAmount = function (order, recocile = false) {
     const currency = order.currencyCode || '';
     const amount = currency.getAmount(order.amount);
     amount.breakdown = { ...getBreakdown(order), ...getItemTotal(order) };
+    if(recocile) {
     reconcileAmount(amount);
+    }
     return amount;
 };
 
@@ -1027,12 +1038,23 @@ const calculateBreakdown = function (total, key, breakdown) {
     return key.includes('discount') ? total -= value : total += value;
 };
 
+//Handle Penny difference.
+//TODO: optimize this function
 function reconcileAmount({ value: total, breakdown }) {
     console.log({ breakdown });
-    const sumOfBreakdown = Object.keys(breakdown).reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
+    const breakdownKeys = Object.keys(breakdown);
+    const sumOfBreakdown = breakdownKeys.reduce((a, c) => calculateBreakdown(a, c, breakdown), 0);
     const reminder = parseFloat((total - sumOfBreakdown).toFixed(2));
-    const fieldToReconcile = breakdown.tax_total || Object.keys[0];
-    fieldToReconcile.value = parseFloat(fieldToReconcile.value) + reminder;
+    if(reminder === 0) return;
+
+    //TODO: Need to re-visit this.
+    // Add reminder in order fields except item_total and discount amount.
+    const key = breakdownKeys
+                            .filter(x =>  x !== BREAKDOWNLOOKUP.item_total || x != BREAKDOWNLOOKUP.shipping_discount)
+                            .find(v => breakdown[v] > 0);
+
+    const fieldToReconcile = breakdown[key] || breakdown[0];
+    fieldToReconcile.value = Math.max(parseFloat(fieldToReconcile.value) + reminder, 0);
 }
 
 function constructPaymentSource(returnUrl, cancelUrl) {
