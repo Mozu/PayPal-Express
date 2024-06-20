@@ -37,7 +37,7 @@ function AppInstall(context, callback) {
             );
 
       Promise.all(tasks).then(function(result) {
-        console.log("PayPal Express payment definition installed");
+        console.log("PayPal Multiparty payment definition installed");
         addCustomRoutes(context, tenant);
       }, function(error) {
         self.cb(error);
@@ -69,7 +69,7 @@ function AppInstall(context, callback) {
     );
 
     Promise.all(tasks).then(function(result) {
-      console.log("PayPal Express custom route installed");
+      console.log("PayPal Multiparty custom route installed");
       enableActions(context, tenant);
     }, function(error) {
       self.cb(error);
@@ -239,9 +239,9 @@ module.exports = function(context, callback) {
 
 },{"../../paypal/constants":2,"../../paypal/helper":3,"mozu-action-helpers/installers/actions":40,"mozu-node-sdk/clients/commerce/settings/checkout/paymentSettings":47,"mozu-node-sdk/clients/commerce/settings/general/customRouteSettings":48,"mozu-node-sdk/constants":51,"underscore":113}],2:[function(require,module,exports){
 module.exports = {
-	PAYMENTSETTINGID: "PayPal Complete Payments Application", // ThirdPartyWorkflow Name, affects name displayed in Admin UI > Settings > Payment Types
+  PAYMENTSETTINGID: "paypal_complete_payments_application", // Must match your DevCenter App's AppKey
 	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
-	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.PayPalMultiparty.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
