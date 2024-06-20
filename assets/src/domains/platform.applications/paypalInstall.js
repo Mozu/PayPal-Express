@@ -36,7 +36,7 @@ function AppInstall(context, callback) {
             );
 
       Promise.all(tasks).then(function(result) {
-        console.log("PayPal Express payment definition installed");
+        console.log("PayPal Multiparty payment definition installed");
         addCustomRoutes(context, tenant);
       }, function(error) {
         self.cb(error);
@@ -68,7 +68,7 @@ function AppInstall(context, callback) {
     );
 
     Promise.all(tasks).then(function(result) {
-      console.log("PayPal Express custom route installed");
+      console.log("PayPal Multiparty custom route installed");
       enableActions(context, tenant);
     }, function(error) {
       self.cb(error);
