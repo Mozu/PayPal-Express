@@ -1,6 +1,6 @@
 const { BREAKDOWNLOOKUP } = require("./constants");
 
-exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
+exports.constructOrderDetails = (order, returnUrl, cancelUrl, merchantId) => {
     const shipping = getShipping(order);
     const items = getItems(order);
     const amount = this.constructOrderAmount(order);
@@ -10,7 +10,10 @@ exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
         amount,
         shipping,
         custom_id: order.id,
-        items
+        items,
+        payee: {
+            merchant_id: merchantId
+        }
     };
 
     return {

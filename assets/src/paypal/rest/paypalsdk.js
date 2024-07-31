@@ -33,9 +33,9 @@ Paypal.prototype.getOrderDetails = async function (id) {
     }
 };
 
-Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl) {
+Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl, merchantId) {
     try {
-        const payload = constructOrderDetails(order, returnUrl, cancelUrl);
+        const payload = constructOrderDetails(order, returnUrl, cancelUrl, merchantId);
         const res = await this.apiWrapper.postWithAuth(this.orderUrl, payload);
         const { id, links } = res || {};
         const redirectData = links && links.find(link => link.rel === LINKREL.payerAction);

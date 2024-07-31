@@ -492,7 +492,7 @@ module.exports = {
 		  return context.response.end();
 		}
 	},
-	getToken: function(context, callback) {
+  getToken: function(context, callback) {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
@@ -544,7 +544,8 @@ module.exports = {
 			return client.CreateOrder(
 					response.order,
 					redirectUrl,
-					cancelUrl
+					cancelUrl,
+					response.config.merchantId
 				);
 		});
 
@@ -1346,9 +1347,9 @@ Paypal.prototype.getOrderDetails = async function (id) {
     }
 };
 
-Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl) {
+Paypal.prototype.CreateOrder = async function (order, returnUrl, cancelUrl, merchantId) {
     try {
-        const payload = constructOrderDetails(order, returnUrl, cancelUrl);
+        const payload = constructOrderDetails(order, returnUrl, cancelUrl, merchantId);
         const res = await this.apiWrapper.postWithAuth(this.orderUrl, payload);
         const { id, links } = res || {};
         const redirectData = links && links.find(link => link.rel === LINKREL.payerAction);
@@ -1677,7 +1678,7 @@ module.exports = {
 },{}],13:[function(require,module,exports){
 const { BREAKDOWNLOOKUP } = require("./constants");
 
-exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
+exports.constructOrderDetails = (order, returnUrl, cancelUrl, merchantId) => {
     const shipping = getShipping(order);
     const items = getItems(order);
     const amount = this.constructOrderAmount(order);
@@ -1687,7 +1688,10 @@ exports.constructOrderDetails = (order, returnUrl, cancelUrl) => {
         amount,
         shipping,
         custom_id: order.id,
-        items
+        items,
+        payee: {
+            merchant_id: merchantId
+        }
     };
 
     return {
