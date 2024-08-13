@@ -300,7 +300,7 @@ module.exports = {
 		  return context.response.end();
 		}
 	},
-	getToken: function(context, callback) {
+  getToken: function(context, callback) {
 		var self = this;
 		var queryString = helper.parseUrl(context);
 		var id = queryString.id;
@@ -352,7 +352,8 @@ module.exports = {
 			return client.CreateOrder(
 					response.order,
 					redirectUrl,
-					cancelUrl
+					cancelUrl,
+					response.config.merchantId
 				);
 		});
 
