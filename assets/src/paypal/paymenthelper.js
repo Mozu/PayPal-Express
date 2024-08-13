@@ -21,13 +21,12 @@ module.exports = {
 	},
 	getConfig: function (paypalSettings) {
 		return {
-			userName: helper.getValue(paypalSettings, paymentConstants.USERNAME),
-			password: helper.getValue(paypalSettings, paymentConstants.PASSWORD),
-			signature: helper.getValue(paypalSettings, paymentConstants.SIGNATURE),
 			environment: helper.getValue(paypalSettings, paymentConstants.ENVIRONMENT) || "sandbox",
 			merchantId: helper.getValue(paypalSettings, paymentConstants.MERCHANTACCOUNTID),
 			processingOption: helper.getValue(paypalSettings, paymentConstants.ORDERPROCESSING) || paymentConstants.CAPTUREONSHIPMENT,
-			enabled: paypalSettings.isEnabled
+			enabled: paypalSettings.isEnabled,
+			onboarded: helper.getValue(paypalSettings, paymentConstants.ONBOARDED),
+			trackingId: helper.getValue(paypalSettings, paymentConstants.TRACKINGID)
 		};
 	},
 
@@ -46,9 +45,12 @@ module.exports = {
 
 		var config = self.getConfig(paypalSettings);
 
-		//TODO; need to change this validation.
-		if (!config.userName || !config.password || !config.environment) {
-			callback("Paypal Express - Environment/User Name/Password/Signatue/MerchantId fields are required.");
+		if (!config.environment) {
+			callback("Paypal Express - Environment config is required.");
+			return;
+		}
+		if (!config.onboarded || config.onboarded == "false") {
+			callback("Paypal Express - Merchant must be onboarded.");
 			return;
 		}
 	},

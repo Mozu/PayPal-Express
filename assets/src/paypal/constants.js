@@ -1,10 +1,14 @@
 module.exports = {
-	PAYMENTSETTINGID: "PayPalExpress2",
+  PAYMENTSETTINGID: "paypal_complete_payments_application", // Must match your DevCenter App's AppKey
+	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
+	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
 	SIGNATURE: "signature",
 	MERCHANTACCOUNTID: "merchantAccountId",
+	ONBOARDED: "onboarded",
+	TRACKINGID: "trackingId",
 	CAPTUREONSUBMIT: "AuthAndCaptureOnOrderPlacement",
 	CAPTUREONSHIPMENT: "AuthOnOrderPlacementAndCaptureOnOrderShipment",
 	ORDERPROCESSING: "orderProcessing",
