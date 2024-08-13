@@ -3,7 +3,7 @@ const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
 function Paypal(paypalConfig, merchantId, sandbox = false) {
-    this.apiWrapper = new ApiService(paypalConfig, merchantId);
+    this.apiWrapper = new ApiService(paypalConfig, merchantId, sandbox);
 
     const {
         sandboxUrl,

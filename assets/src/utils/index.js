@@ -119,7 +119,7 @@ function getItems(order) {
             let item = {
                 name: name,
                 quantity: quantity,
-                description: description,
+                description: description.substring(0, 120), //max length paypal accepts is <=127
                 unit_amount: currency.getAmount(amount)
             };
 
