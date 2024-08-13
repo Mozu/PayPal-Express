@@ -46,7 +46,7 @@ module.exports = {
 		var config = self.getConfig(paypalSettings);
 
 		if (!config.environment) {
-			callback("Paypal Express - Environment fields are required.");
+			callback("Paypal Express - Environment config is required.");
 			return;
 		}
 		if (!config.onboarded || config.onboarded == "false") {
