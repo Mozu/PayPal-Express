@@ -43,7 +43,7 @@ var helper = module.exports = {
 	parseUrl: function(context) {
 		var self = this;
 		var urlParseResult = url.parse(context.request.url);
-		queryStringParams = qs.parse(urlParseResult.query);
+		var queryStringParams = qs.parse(urlParseResult.query);
 		return queryStringParams;
 	},
 	isPayPalCheckout: function(context) {
@@ -110,6 +110,7 @@ var helper = module.exports = {
 			return 	{
 				name: item.product.name,
 				quantity: item.quantity,
+				description: item.product.description,
 				amount: parseFloat(item.discountedTotal/item.quantity).toFixed(2),
 				lineId: item.lineId//,
 				//taxAmount: item.itemTaxTotal
