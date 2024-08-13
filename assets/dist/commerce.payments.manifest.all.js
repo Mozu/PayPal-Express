@@ -500,7 +500,7 @@ module.exports = {
 				});
 			});
 		}).then(function(response) {
-			var client = paymentHelper.getPaypalClient(response.config);
+			var client = paymentHelper.getPaypalClient(response.config, context);
 			// client.setPayOptions(1,0,0);
 			console.log("configuration", context.configuration);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.setExpressCheckout)
@@ -556,7 +556,7 @@ module.exports = {
 			);
 		}).then(function(response) {
 			//get Paypal order details
-			var client = paymentHelper.getPaypalClient(response.config);
+			var client = paymentHelper.getPaypalClient(response.config, context);
 			if (context.configuration && context.configuration.paypal && context.configuration.paypal.getExpressCheckoutDetails)
 				token = context.configuration.paypal.getExpressCheckoutDetails.token;
 
@@ -962,7 +962,7 @@ module.exports = {
 		});
 	},
 	getPaymentConfig: function (context) {
-		var self = this;
+ 		var self = this;
 		return helper.createClientFromContext(PaymentSettings, context, true)
 			.getThirdPartyPaymentWorkflowWithValues({ fullyQualifiedName: helper.getPaymentFQN(context) })
 			.then(function (paypalSettings) {
@@ -981,9 +981,10 @@ module.exports = {
 		};
 	},
 
-	getPaypalClient: function (config) {
-		const { userName, password, environment } = config;
-		const paypalClient = new PaypalRestSdk(userName, password, environment === "sandbox");
+	getPaypalClient: function (config, context) {
+		const { merchantId, environment } = config;
+		const paypalConfig = context.getSecureAppData('paypalConfig');
+		const paypalClient = new PaypalRestSdk(paypalConfig, merchantId, environment === "sandbox");
 		return paypalClient;
 	},
 
@@ -1120,7 +1121,7 @@ module.exports = {
 			details.payerId = payment.billingInfo.data.paypal.payerId;
 		}
 
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.authorization)
 			details.testAmount = context.configuration.paypal.authorization.amount;
 
@@ -1180,7 +1181,7 @@ module.exports = {
 			response.responseCode = 500;
 			return Promise.resolve(response);
 		}
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 		var isPartial = true;
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.capture)
 			paymentAction.amount = context.configuration.paypal.capture.amount;
@@ -1219,7 +1220,7 @@ module.exports = {
 			return { status: paymentConstants.FAILED, responseCode: "InvalidRequest", responseText: "Cannot credit or refund on manual capture." };
 
 		var fullRefund = paymentAction.amount === capturedInteraction.amount;
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.refund)
 			paymentAction.amount = context.configuration.paypal.refund.amount;
@@ -1252,7 +1253,7 @@ module.exports = {
 
 		if (!authorizedInteraction || context.get.isVoidActionNoOp())
 			return { status: paymentConstants.VOIDED, amount: paymentAction.amount };
-		var client = self.getPaypalClient(config);
+		var client = self.getPaypalClient(config, context);
 
 		if (context.configuration && context.configuration.paypal && context.configuration.paypal.void)
 			authorizedInteraction.gatewayTransactionId = context.configuration.paypal.void.authorizationId;
@@ -1274,8 +1275,8 @@ const { constructOrderDetails, getAmount, constructOrderAmount } = require("../.
 const { ApiService } = require("../../utils/apiService");
 const { URLS, LINKREL } = require("../../utils/constants");
 
-function Paypal(clientId, clientSecret, sandbox = false) {
-    this.apiWrapper = new ApiService(clientId, clientSecret);
+function Paypal(paypalConfig, merchantId, sandbox = false) {
+    this.apiWrapper = new ApiService(paypalConfig, merchantId);
 
     const {
         sandboxUrl,
@@ -1410,9 +1411,11 @@ exports.PaypalRestSdk = Paypal;
 const needle = require("needle");
 const { URLS } = require("./constants");
 
-function ApiService(clientId, clientSecret) {
-    this.clientId = clientId;
-    this.clientSecret = clientSecret;
+function ApiService(config, merchantId) {
+    this.clientId = config.clientId; // Kibo's Partner Account clientId
+    this.clientSecret = config.clientSecret; // Kibo's Partner Account secret
+    this.bnCode = config.bnCode; // Kibo's Partner Account BN Code
+    this.merchantId = merchantId; // Client's Merchant Account Id
 }
 
 ApiService.prototype.generateToken = async function () {
@@ -1431,6 +1434,16 @@ ApiService.prototype.generateToken = async function () {
     } catch (err) {
         throw err;
     }
+};
+
+// See "Generate PayPal-Auth-Assertion header" section https://developer.paypal.com/docs/multiparty/checkout/immediate-capture/
+// This header allows our "third party" app to authorize against client's "first party" account
+// eg) if first party created order, this header lets our third party access the order assuming first party is onboarded
+ApiService.prototype.generateAuthAssertion = function () {
+  const auth1 = Buffer.from('{"alg":"none"}').toString("base64");
+  const auth2 = Buffer.from(`{"iss":${this.clientId},"payer_id":${this.merchantId}}`).toString("base64");
+  const authAss = `${auth1}.${auth2}.`;
+  return `${auth1}.${auth2}.`;
 };
 
 ApiService.prototype.get = async function (url, headers, needAuth = false) {
@@ -1501,18 +1514,29 @@ const generateBasicAuth = (clientId, clientSecret) => {
     return Buffer.from(clientId + ":" + clientSecret).toString("base64");
 };
 
-const getAuthHeaders = function (token, contentType = 'application/json') {
+const getAuthHeaders = function (token, authAssertion, contentType = 'application/json') {
     return {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': contentType
+        'Content-Type': contentType,
+        'PayPal-Auth-Assertion': authAssertion
     };
+};
+
+// See BN Code section https://developer.paypal.com/docs/multiparty/create-account/
+// This header allows our Partner account to collect attribution revenue for Merchant transactions
+ApiService.prototype.getAttributionHeader = function () {
+  return {
+    'PayPal-Partner-Attribution-Id': this.bnCode
+  };
 };
 
 ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     if (needAuth) {
         const token = await this.generateToken();
-        const authHeaders = getAuthHeaders(token);
-        headers = { ...headers, ...authHeaders };
+        const authAssertion = this.generateAuthAssertion();
+        const authHeaders = getAuthHeaders(token, authAssertion);
+        const attributionHeader = this.getAttributionHeader();
+        headers = { ...headers, ...authHeaders, ...attributionHeader };
     }
     return headers;
 };

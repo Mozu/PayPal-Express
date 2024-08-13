@@ -1,9 +1,11 @@
 const needle = require("needle");
 const { URLS } = require("./constants");
 
-function ApiService(clientId, clientSecret) {
-    this.clientId = clientId;
-    this.clientSecret = clientSecret;
+function ApiService(config, merchantId) {
+    this.clientId = config.clientId; // Kibo's Partner Account clientId
+    this.clientSecret = config.clientSecret; // Kibo's Partner Account secret
+    this.bnCode = config.bnCode; // Kibo's Partner Account BN Code
+    this.merchantId = merchantId; // Client's Merchant Account Id
 }
 
 ApiService.prototype.generateToken = async function () {
@@ -22,6 +24,15 @@ ApiService.prototype.generateToken = async function () {
     } catch (err) {
         throw err;
     }
+};
+
+// See "Generate PayPal-Auth-Assertion header" section https://developer.paypal.com/docs/multiparty/checkout/immediate-capture/
+// This header allows our "third party" app to authorize against client's "first party" account
+// eg) if first party created order, this header lets our third party access the order assuming first party is onboarded
+ApiService.prototype.generateAuthAssertion = function () {
+  const auth1 = Buffer.from('{"alg":"none"}').toString("base64");
+  const auth2 = Buffer.from(`{"iss":${this.clientId},"payer_id":${this.merchantId}}`).toString("base64");
+  return `${auth1}.${auth2}.`;
 };
 
 ApiService.prototype.get = async function (url, headers, needAuth = false) {
@@ -92,18 +103,29 @@ const generateBasicAuth = (clientId, clientSecret) => {
     return Buffer.from(clientId + ":" + clientSecret).toString("base64");
 };
 
-const getAuthHeaders = function (token, contentType = 'application/json') {
+const getAuthHeaders = function (token, authAssertion, contentType = 'application/json') {
     return {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': contentType
+        'Content-Type': contentType,
+        'PayPal-Auth-Assertion': authAssertion
     };
+};
+
+// See BN Code section https://developer.paypal.com/docs/multiparty/create-account/
+// This header allows our Partner account to collect attribution revenue for Merchant transactions
+ApiService.prototype.getAttributionHeader = function () {
+  return {
+    'PayPal-Partner-Attribution-Id': this.bnCode
+  };
 };
 
 ApiService.prototype.constructHeaders = async function (needAuth, headers) {
     if (needAuth) {
         const token = await this.generateToken();
-        const authHeaders = getAuthHeaders(token);
-        headers = { ...headers, ...authHeaders };
+        const authAssertion = this.generateAuthAssertion();
+        const authHeaders = getAuthHeaders(token, authAssertion);
+        const attributionHeader = this.getAttributionHeader();
+        headers = { ...headers, ...authHeaders, ...attributionHeader };
     }
     return headers;
 };
