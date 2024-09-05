@@ -19,6 +19,8 @@
  * The `request` and `response` objects are both Streams and you can read
  * data out of them the way that you would in Node.
  */
+
+ 
 var paypal = require('../../paypal/checkout');
 var helper = require('../../paypal/helper');
 var Guid = require("easy-guid");
@@ -53,11 +55,12 @@ module.exports = function(context, callback) {
 
 	paypal.getCheckoutSettings(context).then(function(settings) {
 
-		var checkoutUrl = prefix + "/checkout/";
-		if (settings.isMultishipEnabled)
-			checkoutUrl = prefix + "/checkoutV2/";
-		var errorRedirectUrl = (isCart ? defaultRedirect : checkoutUrl + queryString.id);
 		try {
+			var checkoutUrl = prefix + "/checkout/";
+			if (settings.isMultishipEnabled)
+				checkoutUrl = prefix + "/checkoutV2/";
+
+			var errorRedirectUrl = (isCart ? defaultRedirect : checkoutUrl+queryString.id);
 
 			paypal.process(context, queryString, isCart, settings.isMultishipEnabled).then(function(data){
 				var queryStringParams = helper.parseUrl(context);
