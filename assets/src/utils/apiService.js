@@ -3,14 +3,15 @@ const { URLS } = require("./constants");
 
 function ApiService(config, merchantId, isSandbox) {
     this.clientId = isSandbox ? config.sbxClientId : config.prodClientId; // Kibo's Partner Account clientId
-    this.clientSecret = isSandbox ? config.sbxClientSecret : config.prodClientId; // Kibo's Partner Account secret
+    this.clientSecret = isSandbox ? config.sbxClientSecret : config.prodClientSecret; // Kibo's Partner Account secret
     this.bnCode = isSandbox ? config.sbxBnCode : config.prodBnCode; // Kibo's Partner Account BN Code
     this.merchantId = merchantId; // Client's Merchant Account Id
+    this.isSandbox = isSandbox;
 }
 
 ApiService.prototype.generateToken = async function () {
-    const basic = generateBasicAuth(this.clientId, this.clientSecret);
-    const url = URLS.token;
+  const basic = generateBasicAuth(this.clientId, this.clientSecret);
+    const url = this.isSandbox ? URLS.sbxToken : URLS.prodToken;
     const body = { 'grant_type': 'client_credentials' };
     const headers = {
         "Content-Type": "application/x-www-form-urlencoded",
