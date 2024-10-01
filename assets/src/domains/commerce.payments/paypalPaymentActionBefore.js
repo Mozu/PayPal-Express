@@ -70,7 +70,7 @@ var paypal = require('../../paypal/checkout');
 module.exports = function(context, callback) {
   var payment = context.get.payment();
   console.log(payment);
-  if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) return callback();
+  if (payment.paymentType !== paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE  && payment.paymentWorkflow !== paymentConstants.PAYMENTSETTINGID) return callback();
 
     var isMultishipEnabled = context.get.isForCheckout();
 
@@ -82,7 +82,7 @@ module.exports = function(context, callback) {
 
     var existingPayment = _.find(order.payments,
       function(payment) {
-        return payment.paymentType === paymentConstants.PAYMENTSETTINGID  &&
+        return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE  &&
               payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID &&
               payment.status === "Collected";
       });

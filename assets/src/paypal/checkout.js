@@ -174,7 +174,7 @@ function setPayment(context, order, token, payerId, paypalOrder, addBillingInfo,
 		"currencyCode": order.currencyCode,
 		"newBillingInfo":
 	    {
-	        "paymentType": paymentConstants.PAYMENTSETTINGID,
+	        "paymentType": paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE,
 	        "paymentWorkflow": paymentConstants.PAYMENTSETTINGID,
 	        "card" : null,
 	        "billingContact" : billingContact,
@@ -450,7 +450,7 @@ module.exports = {
 	    console.log("Payment Action", paymentAction);
 		console.log("Payment", payment);
 		
-	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) return callback();
+	    if (payment.paymentType !== paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE) return callback();
 
 		return paymentHelper.getPaymentConfig(context)
 		.then(function(config) {
