@@ -151,8 +151,8 @@ module.exports = {
 
 		var details = helper.getOrderDetails(order, false, paymentAction, isMultishipEnabled);
 
-    var existingPayment = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected"; });
-    var existingAuthorized = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized"; });
+    var existingPayment = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW && payment.status === "Collected"; });
+    var existingAuthorized = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW && payment.status === "Authorized"; });
 
 		if (existingAuthorized) {
 			details.token = existingAuthorized.externalTransactionId;

@@ -175,7 +175,7 @@ function setPayment(context, order, token, payerId, paypalOrder, addBillingInfo,
 		"newBillingInfo":
 	    {
 	        "paymentType": paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE,
-	        "paymentWorkflow": paymentConstants.PAYMENTSETTINGID,
+	        "paymentWorkflow": paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW,
 	        "card" : null,
 	        "billingContact" : billingContact,
           	"externalTransactionId" : token,

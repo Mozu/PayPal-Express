@@ -42,7 +42,8 @@ module.exports = {
   PAYMENTSETTINGID: "paypal_complete_payments_application", // Must match your DevCenter App's AppKey
 	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
   PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
-  PAYPALMULTIPARTYPAYMENTTYPE: "PaypalCompletePayments", //This value will get set as Payment.PaymentType and display in Admin UI as Payment Method
+  PAYPALMULTIPARTYPAYMENTTYPE: "PayPalCompletePayments", //This value will get set as Payment.PaymentType and display in Admin UI as Payment Method
+  PAYPALMULTIPARTYPAYMENTWORKFLOW: "PayPalCompletePayments", //This value will get set as Payment.PaymentWorkflow
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
@@ -456,8 +457,8 @@ module.exports = {
 
 		var details = helper.getOrderDetails(order, false, paymentAction, isMultishipEnabled);
 
-    var existingPayment = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected"; });
-    var existingAuthorized = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized"; });
+    var existingPayment = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW && payment.status === "Collected"; });
+    var existingAuthorized = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW && payment.status === "Authorized"; });
 
 		if (existingAuthorized) {
 			details.token = existingAuthorized.externalTransactionId;
