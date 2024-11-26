@@ -10,7 +10,7 @@
     "grunt": "^0.4.5",
     "grunt-browserify": "^4.0.1",
     "grunt-contrib-jshint": "^0.11.3",
-    "grunt-contrib-watch": "^0.6.1",
+    "grunt-contrib-watch": "^1.1.0",
     "grunt-mocha-test": "^0.12.7",
     "grunt-mozu-appdev-sync": "^2.4.1",
     "load-grunt-tasks": "^3.3.0",
