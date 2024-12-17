@@ -6,7 +6,8 @@ module.exports = {
         paymentUrlPrefix: 'v2/payments',
         paymentAuthPrefix: '/authorizations',
         paymentCapturePrefix: '/captures',
-        token: 'https://api-m.sandbox.paypal.com/v1/oauth2/token'
+        sbxToken: 'https://api-m.sandbox.paypal.com/v1/oauth2/token',
+        prodToken: 'https://api-m.paypal.com/v1/oauth2/token'
     },
     BREAKDOWNLOOKUP: {
         shipping: 'shippingAmount',

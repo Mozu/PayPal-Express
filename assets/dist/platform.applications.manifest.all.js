@@ -154,7 +154,7 @@ function AppInstall(context, callback) {
     };
 
     return {
-        "name": paymentConstants.PAYMENTSETTINGID,
+        "name": paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE, // CRT assumes workflow name = PaymentType from leftover PayPalExpress2 logic, so please don't change this
         "namespace": context.get.nameSpace(),
         "isEnabled": "false",
         "description" : "<div style='font-size:13px;font-style:italic'>Please review our <a style='color:blue;' target='mozupaypalhelp' href='http://mozu.github.io/IntegrationDocuments/PayPalExpress/Mozu-PayPalExpress-App.htm'>Help</a> documentation to configure Paypal Express</div>",
@@ -241,7 +241,9 @@ module.exports = function(context, callback) {
 module.exports = {
   PAYMENTSETTINGID: "paypal_complete_payments_application", // Must match your DevCenter App's AppKey
 	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
-	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+  PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+  PAYPALMULTIPARTYPAYMENTTYPE: "PayPalCompletePayments", //This value will get set as Payment.PaymentType and display in Admin UI as Payment Method
+  PAYPALMULTIPARTYPAYMENTWORKFLOW: "PayPalCompletePayments", //This value will get set as Payment.PaymentWorkflow
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",

@@ -116,8 +116,8 @@ module.exports = function(context, callback) {
 		try {
 
 			paypal.process(context, queryString, isCart, settings.isMultishipEnabled).then(function(data){
-				var queryStringParams = helper.parseUrl(context);
-				var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
+        var queryStringParams = helper.parseUrl(context);
+        var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
 				var redirectUrl = checkoutUrl+data.order.id;
 
 				if (paramsToPreserve)
@@ -366,8 +366,8 @@ function setPayment(context, order, token, payerId, paypalOrder, addBillingInfo,
 		"currencyCode": order.currencyCode,
 		"newBillingInfo":
 	    {
-	        "paymentType": paymentConstants.PAYMENTSETTINGID,
-	        "paymentWorkflow": paymentConstants.PAYMENTSETTINGID,
+	        "paymentType": paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE,
+	        "paymentWorkflow": paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW,
 	        "card" : null,
 	        "billingContact" : billingContact,
           	"externalTransactionId" : token,
@@ -642,7 +642,7 @@ module.exports = {
 	    console.log("Payment Action", paymentAction);
 		console.log("Payment", payment);
 		
-	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) return callback();
+	    if (payment.paymentType !== paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE) return callback();
 
 		return paymentHelper.getPaymentConfig(context)
 		.then(function(config) {
@@ -725,7 +725,9 @@ module.exports = {
 module.exports = {
   PAYMENTSETTINGID: "paypal_complete_payments_application", // Must match your DevCenter App's AppKey
 	PAYPALMULTIPARTYAPPKEY: "paypalMultipartyAppKey", // Required for Kibo to recognize thirdpartyworkflow as PayPal Multiparty implementation
-	PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+  PAYPALMULTIPARTYAPPKEYVALUE: "mozuadmin.paypal_complete_payments_application.1.0.0.Release", // Determines which SecureAppData Kibo will pull partner credentials from. TODO pull from install context
+  PAYPALMULTIPARTYPAYMENTTYPE: "PayPalCompletePayments", //This value will get set as Payment.PaymentType and display in Admin UI as Payment Method
+  PAYPALMULTIPARTYPAYMENTWORKFLOW: "PayPalCompletePayments", //This value will get set as Payment.PaymentWorkflow
 	ENVIRONMENT: "environment",
 	USERNAME: "username",
 	PASSWORD: "password",
@@ -1139,8 +1141,8 @@ module.exports = {
 
 		var details = helper.getOrderDetails(order, false, paymentAction, isMultishipEnabled);
 
-		var existingPayment = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Collected"; });
-		var existingAuthorized = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYMENTSETTINGID && payment.paymentWorkflow === paymentConstants.PAYMENTSETTINGID && payment.status === "Authorized"; });
+    var existingPayment = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW && payment.status === "Collected"; });
+    var existingAuthorized = _.find(order.payments, function (payment) { return payment.paymentType === paymentConstants.PAYPALMULTIPARTYPAYMENTTYPE && payment.paymentWorkflow === paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW && payment.status === "Authorized"; });
 
 		if (existingAuthorized) {
 			details.token = existingAuthorized.externalTransactionId;
@@ -1477,14 +1479,15 @@ const { URLS } = require("./constants");
 
 function ApiService(config, merchantId, isSandbox) {
     this.clientId = isSandbox ? config.sbxClientId : config.prodClientId; // Kibo's Partner Account clientId
-    this.clientSecret = isSandbox ? config.sbxClientSecret : config.prodClientId; // Kibo's Partner Account secret
+    this.clientSecret = isSandbox ? config.sbxClientSecret : config.prodClientSecret; // Kibo's Partner Account secret
     this.bnCode = isSandbox ? config.sbxBnCode : config.prodBnCode; // Kibo's Partner Account BN Code
     this.merchantId = merchantId; // Client's Merchant Account Id
+    this.isSandbox = isSandbox;
 }
 
 ApiService.prototype.generateToken = async function () {
-    const basic = generateBasicAuth(this.clientId, this.clientSecret);
-    const url = URLS.token;
+  const basic = generateBasicAuth(this.clientId, this.clientSecret);
+    const url = this.isSandbox ? URLS.sbxToken : URLS.prodToken;
     const body = { 'grant_type': 'client_credentials' };
     const headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1659,7 +1662,8 @@ module.exports = {
         paymentUrlPrefix: 'v2/payments',
         paymentAuthPrefix: '/authorizations',
         paymentCapturePrefix: '/captures',
-        token: 'https://api-m.sandbox.paypal.com/v1/oauth2/token'
+        sbxToken: 'https://api-m.sandbox.paypal.com/v1/oauth2/token',
+        prodToken: 'https://api-m.paypal.com/v1/oauth2/token'
     },
     BREAKDOWNLOOKUP: {
         shipping: 'shippingAmount',
@@ -1677,6 +1681,7 @@ module.exports = {
         approve: 'approve'
     }
 };
+
 },{}],13:[function(require,module,exports){
 const { BREAKDOWNLOOKUP } = require("./constants");
 

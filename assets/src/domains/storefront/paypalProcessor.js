@@ -60,8 +60,8 @@ module.exports = function(context, callback) {
 		try {
 
 			paypal.process(context, queryString, isCart, settings.isMultishipEnabled).then(function(data){
-				var queryStringParams = helper.parseUrl(context);
-				var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
+        var queryStringParams = helper.parseUrl(context);
+        var paramsToPreserve = helper.getParamsToPreserve(queryStringParams);
 				var redirectUrl = checkoutUrl+data.order.id;
 
 				if (paramsToPreserve)
