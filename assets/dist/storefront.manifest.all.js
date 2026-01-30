@@ -319,7 +319,7 @@ function setPayment(context, order, token, payerId,paypalOrder, addBillingInfo,i
 	console.log("order", order);
 	if (order.amountRemainingForPayment < 0) return order;
 	var registeredShopper = getUserEmail(context);
-	
+
 	var billingContact = {"email" : registeredShopper || paypalOrder.EMAIL};
 
 	if (addBillingInfo && paypalOrder.BILLINGNAME) {
@@ -495,7 +495,7 @@ var paypalCheckout = module.exports = {
 		var isCart = queryString.isCart == 'true';
 		var paramsToPreserve = helper.getParamsToPreserve(queryString);
 		var referrer = helper.parseHref(context);
-		var domain = [context.items.siteContext.secureHost,helper.getUrlPrefix(context)].filter(Boolean).join('');
+    var domain = [context.items.pageContext.secureHost,helper.getUrlPrefix(context)].filter(Boolean).join('');
 		//var redirectUrl = domain+(isCart ? "/cart" : "/checkout/"+id)+ "?paypalCheckout=1"+(isCart ? "&id="+id : "");
 		var createRedirectUrl = function(isMultiShip) {
 			var url = domain + "/paypal/checkout?id=" + id + "&isCart=" + (isCart ? 1 : 0);
@@ -519,14 +519,14 @@ var paypalCheckout = module.exports = {
 				cancelUrl = createCancelUrl(settings.isMultishipEnabled);
 
 				return helper.getOrder(context, id, isCart, settings.isMultishipEnabled).then(function(order) {
-					
+
 					order.email = getUserEmail(context);
 					console.log(order.email);
 					return {
 						config: config,
 						order: helper.getOrderDetails(order, true, null, settings.isMultishipEnabled)
 					};
-	
+
 				});
 			});
 		}).then(function(response) {
@@ -604,7 +604,7 @@ var paypalCheckout = module.exports = {
 			// If the order is from a quote, don't update fulfillment info / shipping address on order
 			console.log("Is quote order ? ", response.order.originalQuoteId ? "Yes": "No");
 			if (response.order.originalQuoteId) return response;
-			
+
 			return setFulfillmentInfo(context, response.order, response.paypalOrder, isMultiShipToEnabled).
 			then(function(fulfillmentInfo) {
 				if (!isMultiShipToEnabled)
@@ -637,7 +637,7 @@ var paypalCheckout = module.exports = {
 
 	    console.log("Payment Action", paymentAction);
 		console.log("Payment", payment);
-		
+
 	    if (payment.paymentType !== paymentConstants.PAYMENTSETTINGID) return callback();
 
 		return paymentHelper.getPaymentConfig(context)
@@ -686,7 +686,7 @@ var paypalCheckout = module.exports = {
 
 		if (queryString.ppErrorId){
 			cache.get("PPE-"+queryString.ppErrorId)
-				.then(function(paypalError){				
+				.then(function(paypalError){
 					console.log("Adding paypal error to viewData", paypalError);
 					var message = paypalError;
 					if (paypalError.statusText)
@@ -701,12 +701,12 @@ var paypalCheckout = module.exports = {
 					else if (paypalError.message){
 						message = paypalError.message;
 						if (message.errorMessage)
-							message = message.errorMessage;	
+							message = message.errorMessage;
 					}
 					else if (paypalError.errorMessage)
-						message = paypalError.errorMessage;	
-					context.response.viewData.model.messages = [{'message' : message}];	
-					callback();			
+						message = paypalError.errorMessage;
+					context.response.viewData.model.messages = [{'message' : message}];
+					callback();
 				})
 				.catch(function(err){
 					console.log("cannot get paypal error from cache:", err);
