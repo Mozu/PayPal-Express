@@ -51,9 +51,10 @@ var helper = module.exports = {
 		return (queryString.PayerID !== "" &&
 			queryString.token !== "" && queryString.id !== ""  );
 	},
-	getPaymentFQN: function(context) {
+	// Returns the fullyQualifiedName for the PayPal third-party workflow under commerce/settings/checkout/paymentsettings
+	getThirdPartyWorkflowFQN: function(context) {
 		var appInfo = getAppInfo(context);
-		return appInfo.namespace+"~"+paymentConstants.PAYMENTSETTINGID;
+		return appInfo.namespace+"~"+paymentConstants.PAYPALMULTIPARTYPAYMENTWORKFLOW;
 	},
 	getValue: function(paymentSetting,  key) {
 		var value = _.findWhere(paymentSetting.credentials, {"apiName" : key}) || _.findWhere(paymentSetting.Credentials, {"APIName" : key}) ;
