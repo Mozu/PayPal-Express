@@ -14,7 +14,7 @@ module.exports = {
 	getPaymentConfig: function (context) {
  		var self = this;
 		return helper.createClientFromContext(PaymentSettings, context, true)
-			.getThirdPartyPaymentWorkflowWithValues({ fullyQualifiedName: helper.getPaymentFQN(context) })
+			.getThirdPartyPaymentWorkflowWithValues({ fullyQualifiedName: helper.getThirdPartyWorkflowFQN(context) })
 			.then(function (paypalSettings) {
 				return self.getConfig(paypalSettings);
 			});
@@ -40,7 +40,7 @@ module.exports = {
 	validatePaymentSettings: function (context, callback) {
 		var self = this;
 		var paymentSettings = context.request.body;
-		var paypalSettings = _.findWhere(paymentSettings.externalPaymentWorkflowDefinitions, { fullyQualifiedName: helper.getPaymentFQN(context) });
+		var paypalSettings = _.findWhere(paymentSettings.externalPaymentWorkflowDefinitions, { fullyQualifiedName: helper.getThirdPartyWorkflowFQN(context) });
 		if (!paypalSettings || !paypalSettings.IsEnabled) callback();
 
 		var config = self.getConfig(paypalSettings);
