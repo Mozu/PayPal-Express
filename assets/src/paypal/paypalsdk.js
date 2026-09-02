@@ -302,14 +302,32 @@ Paypal.prototype.request = function( params) {
 			encodedParams,
 			{json: false, parse: true,open_timeout: 60000},
 			function(err, response, body) {
+				if (err && !response) {
+					console.error("Paypal express request failed", err);
+					reject({
+						statusText: err.message || "Request failed",
+						correlationId: "",
+						data: err
+					});
+					return;
+				}
 				if (response.statusCode != 200){
-					console.log("Paypal express Error", response);
-					reject({statusCode : response.StatusCode, data: err});
+					console.error("Paypal express Error", response);
+					// non-NVP error bodies (e.g. gateway/HTML error pages) won't parse as querystring
+					var parsedBody;
+					try { parsedBody = querystring.parse(body); } catch (parseErr) { parsedBody = null; }
+					reject({
+						statusCode: response.statusCode,
+						statusText: "HTTP " + response.statusCode,
+						correlationId: (parsedBody && parsedBody.CORRELATIONID) || "",
+						data: err,
+						body: body
+					});
 				}
 				else {
 					var data = querystring.parse(body);
 					if (data.ACK !== 'Success') {
-						console.log("Paypal express error", data);
+						console.error("Paypal express error", data);
 						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0,
 							"correlationId" : data.CORRELATIONID, "method" : params.METHOD,
 							"statusMessage": data.L_SHORTMESSAGE0, "errorCode" : data.L_ERRORCODE0});

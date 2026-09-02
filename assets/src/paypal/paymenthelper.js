@@ -65,9 +65,9 @@ module.exports = {
 		return newStatus;
 	},
 	getPaymentResult: function (result, status, amount) {
-		console.log(result);
 		var response = {status : status,amount: amount};
 		if (status === paymentConstants.FAILED || status === paymentConstants.DECLINED) {
+			console.error(result);
 			response.responseText = result.statusText+" - "+result.correlationId;
 			response.responseCode = result.errorCode;
 		}
