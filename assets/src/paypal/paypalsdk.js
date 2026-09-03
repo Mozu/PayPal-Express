@@ -328,7 +328,7 @@ Paypal.prototype.request = function( params) {
 				else {
 					var data = querystring.parse(body);
 					if (data.ACK !== 'Success') {
-						console.error("Paypal express error", data);
+						console.error("Paypal express error", data, "rawBody:", body);
 						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0 || "PayPal declined the request",
 							"correlationId" : data.CORRELATIONID || "", "method" : params.METHOD,
 							"statusMessage": data.L_SHORTMESSAGE0, "errorCode" : data.L_ERRORCODE0});
