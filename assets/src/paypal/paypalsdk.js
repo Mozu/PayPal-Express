@@ -162,7 +162,7 @@ Paypal.prototype.authorizePayment = function(orderDetails, config) {
 
 	params.PAYERID = orderDetails.payerId;
 	params.TOKEN = orderDetails.token;
-	params.BUTTONSOURCE = config.buttonSource;
+	params.BUTTONSOURCE = config && config.buttonSource;
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
 
@@ -312,29 +312,34 @@ Paypal.prototype.request = function( params) {
 					});
 					return;
 				}
+				// needle leaves NVP bodies as a raw Buffer; querystring.parse() silently
+				// returns {} for non-string input, so it must be stringified first.
+				var bodyString = Buffer.isBuffer(body) ? body.toString('utf8') : body;
 				if (!response || response.statusCode != 200){
 					console.error("Paypal express Error", response);
 					// non-NVP error bodies (e.g. gateway/HTML error pages) won't parse as querystring
 					var parsedBody;
-					try { parsedBody = querystring.parse(body); } catch (parseErr) { parsedBody = null; }
+					try { parsedBody = querystring.parse(bodyString); } catch (parseErr) { parsedBody = null; }
 					reject({
 						statusCode: response ? response.statusCode : undefined,
 						statusText: "HTTP " + (response ? response.statusCode : "unknown"),
 						correlationId: (parsedBody && parsedBody.CORRELATIONID) || "",
 						data: err,
-						body: body
+						body: bodyString
 					});
 				}
 				else {
-					var data = querystring.parse(body);
+					var data = querystring.parse(bodyString);
 					if (data.ACK !== 'Success') {
-						console.error("Paypal express error", data, "rawBody:", body);
+						console.error("Paypal express error", data, "rawBody:", bodyString);
 						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0 || "PayPal declined the request",
 							"correlationId" : data.CORRELATIONID || "", "method" : params.METHOD,
 							"statusMessage": data.L_SHORTMESSAGE0, "errorCode" : data.L_ERRORCODE0});
 					}
-					else
+					else {
+						console.log("Paypal express success", params.METHOD, "correlationId:", data.CORRELATIONID);
 						resolve(data);
+					}
 				}
 			}
 		);

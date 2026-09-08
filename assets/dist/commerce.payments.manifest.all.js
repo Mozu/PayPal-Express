@@ -998,9 +998,9 @@ module.exports = {
 		return newStatus;
 	},
 	getPaymentResult: function (result, status, amount) {
-		console.log(result);
 		var response = {status : status,amount: amount};
 		if (status === paymentConstants.FAILED || status === paymentConstants.DECLINED) {
+			console.error(result);
 			response.responseText = result.statusText+" - "+result.correlationId;
 			response.responseCode = result.errorCode;
 		}
@@ -1426,7 +1426,7 @@ Paypal.prototype.authorizePayment = function(orderDetails, config) {
 
 	params.PAYERID = orderDetails.payerId;
 	params.TOKEN = orderDetails.token;
-	params.BUTTONSOURCE = config.buttonSource;
+	params.BUTTONSOURCE = config && config.buttonSource;
 	params.PAYMENTREQUEST_0_PAYMENTACTION = "Authorization";
 	params.METHOD = 'DoExpressCheckoutPayment';
 
@@ -1566,20 +1566,44 @@ Paypal.prototype.request = function( params) {
 			encodedParams,
 			{json: false, parse: true,open_timeout: 60000},
 			function(err, response, body) {
-				if (response.statusCode != 200){
-					console.log("Paypal express Error", response);
-					reject({statusCode : response.StatusCode, data: err});
+				if (err) {
+					console.error("Paypal express request failed", err, response);
+					reject({
+						statusCode: response ? response.statusCode : undefined,
+						statusText: err.message || "Request failed",
+						correlationId: "",
+						data: err
+					});
+					return;
+				}
+				// needle leaves NVP bodies as a raw Buffer; querystring.parse() silently
+				// returns {} for non-string input, so it must be stringified first.
+				var bodyString = Buffer.isBuffer(body) ? body.toString('utf8') : body;
+				if (!response || response.statusCode != 200){
+					console.error("Paypal express Error", response);
+					// non-NVP error bodies (e.g. gateway/HTML error pages) won't parse as querystring
+					var parsedBody;
+					try { parsedBody = querystring.parse(bodyString); } catch (parseErr) { parsedBody = null; }
+					reject({
+						statusCode: response ? response.statusCode : undefined,
+						statusText: "HTTP " + (response ? response.statusCode : "unknown"),
+						correlationId: (parsedBody && parsedBody.CORRELATIONID) || "",
+						data: err,
+						body: bodyString
+					});
 				}
 				else {
-					var data = querystring.parse(body);
+					var data = querystring.parse(bodyString);
 					if (data.ACK !== 'Success') {
-						console.log("Paypal express error", data);
-						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0,
-							"correlationId" : data.CORRELATIONID, "method" : params.METHOD,
+						console.error("Paypal express error", data, "rawBody:", bodyString);
+						reject({"ACK" : data.ACK,  "statusText" : data.L_LONGMESSAGE0 || "PayPal declined the request",
+							"correlationId" : data.CORRELATIONID || "", "method" : params.METHOD,
 							"statusMessage": data.L_SHORTMESSAGE0, "errorCode" : data.L_ERRORCODE0});
 					}
-					else
+					else {
+						console.log("Paypal express success", params.METHOD, "correlationId:", data.CORRELATIONID);
 						resolve(data);
+					}
 				}
 			}
 		);
