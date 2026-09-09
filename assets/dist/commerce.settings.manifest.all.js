@@ -357,8 +357,9 @@ module.exports = {
 		var response = {status : status,amount: amount};
 		if (status === paymentConstants.FAILED || status === paymentConstants.DECLINED) {
 			console.error(result);
-			response.responseText = result.statusText+" - "+result.correlationId;
-			response.responseCode = result.errorCode;
+			var statusText = (result.statusText instanceof Error) ? result.statusText.message : (result.statusText || "Unknown error");
+			response.responseText = result.correlationId ? statusText+" - "+result.correlationId : statusText;
+			response.responseCode = result.errorCode || result.statusCode;
 		}
 		else {
 			response.transactionId = result.transactionId;
@@ -944,7 +945,7 @@ Paypal.prototype.request = function( params) {
 						statusCode: response ? response.statusCode : undefined,
 						statusText: "HTTP " + (response ? response.statusCode : "unknown"),
 						correlationId: (parsedBody && parsedBody.CORRELATIONID) || "",
-						data: err,
+						data: parsedBody,
 						body: bodyString
 					});
 				}

@@ -324,7 +324,7 @@ Paypal.prototype.request = function( params) {
 						statusCode: response ? response.statusCode : undefined,
 						statusText: "HTTP " + (response ? response.statusCode : "unknown"),
 						correlationId: (parsedBody && parsedBody.CORRELATIONID) || "",
-						data: err,
+						data: parsedBody,
 						body: bodyString
 					});
 				}
