@@ -65,11 +65,12 @@ module.exports = {
 		return newStatus;
 	},
 	getPaymentResult: function (result, status, amount) {
-		console.log(result);
 		var response = {status : status,amount: amount};
 		if (status === paymentConstants.FAILED || status === paymentConstants.DECLINED) {
-			response.responseText = result.statusText+" - "+result.correlationId;
-			response.responseCode = result.errorCode;
+			console.error(result);
+			var statusText = (result.statusText instanceof Error) ? result.statusText.message : (result.statusText || "Unknown error");
+			response.responseText = result.correlationId ? statusText+" - "+result.correlationId : statusText;
+			response.responseCode = result.errorCode || result.statusCode;
 		}
 		else {
 			response.transactionId = result.transactionId;
